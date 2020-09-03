@@ -124,8 +124,8 @@ class Subgraph_Model:
     def get_initial_alignments(self, amrs):
 
         alignments = {}
-        print('Preprocessing')
-        for amr in tqdm(amrs, file=sys.stdout):
+        for j, amr in enumerate(amrs):
+            print(f'\r{j} / {len(amrs)} preprocessed', end='')
             alignments[amr.id] = []
             for span in amr.spans:
                 alignments[amr.id].append(AMR_Alignment(type='subgraph', tokens=span, amr=amr))
@@ -137,6 +137,7 @@ class Subgraph_Model:
                 preprocess(amr, alignments, align)
                 if ENGLISH:
                     preprocess_english(amr, alignments, align)
+        print('\r', end='')
         return alignments
 
     def update_parameters(self, amrs, alignments):
@@ -351,16 +352,14 @@ def main():
     align_model = Subgraph_Model(amrs)
     iters = 10
 
-    alignments = align_model.get_initial_alignments(amrs)
-
     for i in range(iters-1):
         print(f'Epoch {i}')
-        alignments = align_all(align_model, amrs, alignments)
+        alignments = align_all(align_model, amrs)
         align_model.update_parameters(amrs, alignments)
 
         Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
     print(f'Epoch {iters-1}')
-    alignments = align_all(align_model, amrs, alignments)
+    alignments = align_all(align_model, amrs)
     align_model.update_parameters(amrs, alignments)
 
     Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{iters-1}.html')
