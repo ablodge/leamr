@@ -1,5 +1,6 @@
 import math
 import sys
+from random import random
 
 from tqdm import tqdm
 
@@ -9,6 +10,7 @@ from tqdm import tqdm
 # - get_scores(amr, alignments, n, unaligned)
 # - logp(amr, alignments, align)
 # - readable_logp(amr, alignments, align)
+# - postprocess(amr, alignments, align)
 
 def align_all(model, amrs, alignments=None):
     if alignments is None:
@@ -22,29 +24,25 @@ def align_all(model, amrs, alignments=None):
         while unaligned:
             all_scores = {}
             candidate_aligns = {}
-            partitions = {}
 
             for n in unaligned:
-                n_aligns, n_scores, n_partions = model.get_scores(amr, alignments, n, unaligned)
+                n_aligns, n_scores = model.get_scores(amr, alignments, n, unaligned)
                 for span in n_scores:
                     all_scores[(n,span)] = n_scores[span]
                     candidate_aligns[(n,span)] = n_aligns[span]
-                    partitions[(n,span)] = n_partions[span]
 
-            candidates = [(n, span) for n, span in all_scores if n in unaligned]
-            new_scores = {}
-            for n,span in candidates:
-                new_scores[(n,span)] = all_scores[(n,span)]
-
-            best = max(new_scores.keys(), key=lambda x: new_scores[x])
+            best = max(all_scores.keys(), key=lambda x: all_scores[x])
             n, span = best
             span = list(span)
             new_align = candidate_aligns[best]
-            # readable = [(math.exp(new_scores[(n,span)]),
-            #             amr.nodes[n],
+
+            # old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
+            # readable = [(all_scores[(n,span)],
+            #             amr.nodes[n] if n in amr.nodes else n,
             #              ' '.join(amr.lemmas[t] for t in span),
             #              model.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-            #              ) for n,span in new_scores.keys()]
+            #              model.readable_logp(amr, alignments, old_alignments[span]),
+            #              ) for n,span in all_scores.keys()]
             # readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
             # print()
 
