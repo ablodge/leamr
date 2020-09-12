@@ -1,16 +1,13 @@
 import math
 import sys
-from random import random
 
 from tqdm import tqdm
 
 # requires class that implements:
 # - get_initial_alignments(amrs)
 # - get_unaligned(amr, aignments)
-# - get_scores(amr, alignments, n, unaligned)
+# - align(amr, alignments, n, unaligned)
 # - logp(amr, alignments, align)
-# - readable_logp(amr, alignments, align)
-# - postprocess(amr, alignments, align)
 
 def align_all(model, amrs, alignments=None):
     if alignments is None:
@@ -26,10 +23,13 @@ def align_all(model, amrs, alignments=None):
             candidate_aligns = {}
 
             for n in unaligned:
-                n_aligns, n_scores = model.get_scores(amr, alignments, n, unaligned)
-                for span in n_scores:
-                    all_scores[(n,span)] = n_scores[span]
-                    candidate_aligns[(n,span)] = n_aligns[span]
+                best_align, best_score = model.align(amr, alignments, n, unaligned)
+                if best_align is None: continue
+                span = tuple(best_align.tokens)
+                all_scores[(n,span)] = best_score
+                candidate_aligns[(n,span)] = best_align
+            if not all_scores:
+                break
 
             best = max(all_scores.keys(), key=lambda x: all_scores[x])
             n, span = best

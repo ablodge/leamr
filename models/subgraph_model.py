@@ -18,9 +18,10 @@ ENGLISH = True
 
 class Subgraph_Model:
 
-    def __init__(self, amrs, alpha=1):
+    def __init__(self, amrs, alpha=1, ignore_duplicates=True):
 
         self.alpha = alpha
+        self.ignore_duplicates = ignore_duplicates
         self.translation_count = {}
         self.translation_total = 0
         self.num_sungraphs = 1
@@ -59,6 +60,15 @@ class Subgraph_Model:
         elif token_label in self.translation_count and subgraph_label in self.translation_count[token_label]:
             trans_logp = math.log(self.translation_count[token_label][subgraph_label]+self.alpha) - math.log(self.translation_total)
             trans_logp -= token_logp
+        elif len(token_label.split())>1 and any(t in self.translation_count and subgraph_label in self.translation_count[t] for t in token_label.split()):
+            max_logp = float('-inf')
+            for tok in token_label.split():
+                if tok not in self.translation_count: continue
+                logp = math.log(self.translation_count[tok][subgraph_label] + self.alpha) - math.log(self.translation_total)
+                logp -= token_logp
+                if logp > max_logp:
+                    max_logp = logp
+            trans_logp = max_logp
         else:
             trans_logp = self.naive_subgraph_model.logp(amr, align)
 
@@ -135,16 +145,16 @@ class Subgraph_Model:
             for span in amr.spans:
                 alignments[amr.id].append(AMR_Alignment(type='subgraph', tokens=span, amr=amr))
 
-            subgraph_fuzzy_align(amr, alignments)
-            if ENGLISH:
-                subgraph_exact_align_english(amr, alignments)
-            for align in alignments[amr.id]:
-                postprocess_subgraph(amr, alignments, align)
-                if ENGLISH:
-                    postprocess_subgraph_english(amr, alignments, align)
-                test = clean_subgraph(amr, alignments, align)
-                if test is None:
-                    align.nodes.clear()
+            # subgraph_fuzzy_align(amr, alignments)
+            # if ENGLISH:
+            #     subgraph_exact_align_english(amr, alignments)
+            # for align in alignments[amr.id]:
+            #     postprocess_subgraph(amr, alignments, align)
+            #     if ENGLISH:
+            #         postprocess_subgraph_english(amr, alignments, align)
+            #     test = clean_subgraph(amr, alignments, align)
+            #     if test is None:
+            #         align.nodes.clear()
         print('\r', end='')
         return alignments
 
@@ -185,14 +195,17 @@ class Subgraph_Model:
         distance_stdev = stdev(distances)
         self.distance_model.update_parameters(distance_mean, distance_stdev)
 
-    def get_scores(self, amr, alignments, n, unaligned=None):
+    def align(self, amr, alignments, n, unaligned=None):
 
         # get candidates
         if unaligned is None:
             unaligned = self.get_unaligned(amr, alignments)
         candidate_spans = [align.tokens for align in alignments[amr.id] if not align.nodes]
-        candidate_neighbors = [s for s, r, t in amr.edges if t == n and s not in unaligned] + \
-                              [t for s, r, t in amr.edges if s == n and t not in unaligned]
+        tmp_align = AMR_Alignment(type='subgraph', tokens=[0], nodes=[n])
+        postprocess_subgraph(amr, alignments, tmp_align)
+        candidate_neighbors = [s for s, r, t in amr.edges if t in tmp_align.nodes and s not in unaligned] + \
+                              [t for s, r, t in amr.edges if s in tmp_align.nodes and t not in unaligned]
+        candidate_neighbors = [n2 for n2 in candidate_neighbors if amr.get_alignment(alignments, node_id=n2)]
 
         # handle "never => ever, -" and other similar cases
         edge_map = {n:[] for n in amr.nodes}
@@ -208,10 +221,6 @@ class Subgraph_Model:
                 if any(n in edge_map[p] and n2 in edge_map[p] for p in amr.nodes):
                     candidate_neighbors.append(n2)
 
-        for n2 in candidate_neighbors[:]:
-            nalign = amr.get_alignment(alignments, node_id=n2)
-            if nalign.type!='subgraph' or not nalign:
-                candidate_neighbors.remove(n2)
 
         readable = []
         scores1 = {}
@@ -242,8 +251,15 @@ class Subgraph_Model:
             all_scores[span] = scores2[x]
             all_aligns[span] = aligns2[x]
 
+        if not all_scores:
+            return None, None
+
+        best_span = max(all_scores.keys(), key=lambda x:all_scores[x])
+        best_score = all_scores[best_span]
+        best_align = all_aligns[best_span]
+
         # readable = [r for r in sorted(readable, key=lambda x:x['score'], reverse=True)]
-        return all_aligns, all_scores
+        return best_align, best_score
 
 
     def get_unaligned(self, amr, alignments):
@@ -252,6 +268,10 @@ class Subgraph_Model:
             for n in align.nodes:
                 if n in unaligned:
                     unaligned.remove(n)
+        if self.ignore_duplicates:
+            duplicates = [n for n in unaligned if len([n2 for n2 in amr.nodes if amr.nodes[n2]==amr.nodes[n]])>1]
+            for n in duplicates:
+                unaligned.remove(n)
         return list(unaligned)
 
     def readable_logp(self, amr, alignments, align):
