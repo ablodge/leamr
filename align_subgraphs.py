@@ -61,6 +61,7 @@ def coverage(amrs, alignments):
             total+=1
     return f'{100*coverage_count/total:.2f}%'
 
+
 def resolve_inconsistent_alignments(amrs, subgraph_alignments, candidate_alignments, model):
     for amr in tqdm(amrs, file=sys.stdout):
         for aligns in candidate_alignments[amr.id]:
@@ -123,6 +124,8 @@ def main():
             if ENGLISH: subgraph_exact_align_english(amr, new_alignments)
             for align in new_alignments:
                 if not align: continue
+                postprocess_subgraph(amr, subgraph_alignments, align)
+                if ENGLISH: postprocess_subgraph_english(amr, subgraph_alignments, align)
                 new_aligns = separate_components(amr, align)
                 if len(new_aligns)==1:
                     new_align = new_aligns[0]
@@ -131,6 +134,7 @@ def main():
                     if VERBOSE:
                         print(new_align.readable(amr))
                 else:
+                    new_aligns.append((AMR_Alignment(type='subgraph', tokens=align.tokens)))
                     multiple_subgraph_alignments[amr.id].append(new_aligns)
             for n in amr.nodes:
                 n_aligns = [a for a in subgraph_alignments[amr.id] if n in a.nodes]
