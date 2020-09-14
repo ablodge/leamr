@@ -38,16 +38,14 @@ class Display:
     @staticmethod
     def edge_desc(amr, e):
         align = amr.get_alignment(edge=e)
-        if align and align.type == 'subgraph':
+        if align and align.type == 'relation':
             return ' '.join(amr.tokens[t] for t in align.tokens)
-        if align and align.type.startswith('dupl'):
-            return '<duplicate>'
         return ''
 
     @staticmethod
     def edge_color(amr, e):
         align = amr.get_alignment(edge=e)
-        if align and align.type == 'subgraph':
+        if align and align.type == 'relation':
             if not align.nodes:
                 return 'red'
             return 'grey'

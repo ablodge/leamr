@@ -67,8 +67,9 @@ def resolve_inconsistent_alignments(amrs, subgraph_alignments, candidate_alignme
         for aligns in candidate_alignments[amr.id]:
             if not aligns: continue
             scores = {}
-            for i,align in enumerate(aligns):
-                scores[i] = model.logp(amr, subgraph_alignments, align)
+            for i,new_align in enumerate(aligns):
+                null_align = AMR_Alignment(type='subgraph', tokens=new_align.tokens)
+                scores[i] = model.logp(amr, subgraph_alignments, new_align) - model.logp(amr, subgraph_alignments, null_align)
             best = max(scores, key=lambda x:scores[x])
             new_align = aligns[best]
             add_alignment(amr, subgraph_alignments, new_align)
@@ -106,8 +107,8 @@ def main():
 
     subgraph_model = Subgraph_Model(amrs, ignore_duplicates=IGNORE_DUPLICATES)
 
-    node_alignments = load_from_json(align_file)
-    subgraph_alignments = subgraph_model.get_initial_alignments(amrs)
+    node_alignments = load_from_json(align_file, amrs)
+    subgraph_alignments = subgraph_model.get_initial_alignments(amrs, preprocess=False)
     multiple_subgraph_alignments = {}
     multiple_span_alignments = {}
 
@@ -134,7 +135,6 @@ def main():
                     if VERBOSE:
                         print(new_align.readable(amr))
                 else:
-                    new_aligns.append((AMR_Alignment(type='subgraph', tokens=align.tokens)))
                     multiple_subgraph_alignments[amr.id].append(new_aligns)
             for n in amr.nodes:
                 n_aligns = [a for a in subgraph_alignments[amr.id] if n in a.nodes]
@@ -200,7 +200,10 @@ def main():
     print('align all', coverage(amrs, subgraph_alignments))
     for amr in amrs:
         amr.alignments = subgraph_alignments[amr.id]
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + '.subgraphs.html')
+
+    display_file = amr_file.replace('.txt', '') + '.subgraphs.html'
+    print(f'Creating alignments display file: {display_file}')
+    Display.style(amrs[:100], display_file)
 
     amrs_dict = {}
     for amr in amrs:

@@ -4,7 +4,7 @@ import sys
 from collections import Counter
 from statistics import stdev, mean
 
-from amr_utils.alignments import AMR_Alignment
+from amr_utils.alignments import AMR_Alignment, write_to_json
 from amr_utils.amr_readers import JAMR_AMR_Reader
 
 from display import Display
@@ -24,7 +24,7 @@ class Subgraph_Model:
         self.ignore_duplicates = ignore_duplicates
         self.translation_count = {}
         self.translation_total = 0
-        self.num_sungraphs = 1
+        self.num_subgraphs = 1
 
         self.tokens_count = Counter()
         self.tokens_total = 0
@@ -136,7 +136,7 @@ class Subgraph_Model:
             logp += self.distance_model.logp(self.distance_model.distance_stdev)
         return logp
 
-    def get_initial_alignments(self, amrs):
+    def get_initial_alignments(self, amrs, preprocess=True):
 
         alignments = {}
         for j, amr in enumerate(amrs):
@@ -144,17 +144,17 @@ class Subgraph_Model:
             alignments[amr.id] = []
             for span in amr.spans:
                 alignments[amr.id].append(AMR_Alignment(type='subgraph', tokens=span, amr=amr))
-
-            # subgraph_fuzzy_align(amr, alignments)
-            # if ENGLISH:
-            #     subgraph_exact_align_english(amr, alignments)
-            # for align in alignments[amr.id]:
-            #     postprocess_subgraph(amr, alignments, align)
-            #     if ENGLISH:
-            #         postprocess_subgraph_english(amr, alignments, align)
-            #     test = clean_subgraph(amr, alignments, align)
-            #     if test is None:
-            #         align.nodes.clear()
+            if preprocess:
+                subgraph_fuzzy_align(amr, alignments)
+                if ENGLISH:
+                    subgraph_exact_align_english(amr, alignments)
+                for align in alignments[amr.id]:
+                    postprocess_subgraph(amr, alignments, align)
+                    if ENGLISH:
+                        postprocess_subgraph_english(amr, alignments, align)
+                    test = clean_subgraph(amr, alignments, align)
+                    if test is None:
+                        align.nodes.clear()
         print('\r', end='')
         return alignments
 
@@ -205,7 +205,10 @@ class Subgraph_Model:
         postprocess_subgraph(amr, alignments, tmp_align)
         candidate_neighbors = [s for s, r, t in amr.edges if t in tmp_align.nodes and s not in unaligned] + \
                               [t for s, r, t in amr.edges if s in tmp_align.nodes and t not in unaligned]
-        candidate_neighbors = [n2 for n2 in candidate_neighbors if amr.get_alignment(alignments, node_id=n2)]
+        for n2 in candidate_neighbors[:]:
+            nalign = amr.get_alignment(alignments, node_id=n2)
+            if not nalign or nalign.type!='subgraph':
+                candidate_neighbors.remove(n2)
 
         # handle "never => ever, -" and other similar cases
         edge_map = {n:[] for n in amr.nodes}
@@ -217,10 +220,10 @@ class Subgraph_Model:
                 if n2 in unaligned: continue
                 if amr.nodes[n] == amr.nodes[n2]: continue
                 nalign = amr.get_alignment(alignments, node_id=n2)
+                if nalign.type != 'subgraph': continue
                 if len(nalign.nodes)!=1: continue
                 if any(n in edge_map[p] and n2 in edge_map[p] for p in amr.nodes):
                     candidate_neighbors.append(n2)
-
 
         readable = []
         scores1 = {}
@@ -477,22 +480,24 @@ def main():
         align_model.update_parameters(amrs, alignments)
 
         Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
-    print(f'Epoch {iters-1}')
+
+        align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
+        print(f'Writing subgraph alignments to: {align_file}')
+        write_to_json(align_file, alignments)
+    i = iters - 1
+    print(f'Epoch {i}')
     alignments = align_all(align_model, amrs)
     align_model.update_parameters(amrs, alignments)
 
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{iters-1}.html')
+    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
 
     amrs_dict = {}
     for amr in amrs:
         amrs_dict[amr.id] = amr
 
-    for k in alignments:
-        alignments[k] = [a.to_json(amrs_dict[k]) for a in alignments[k] if a.type.startswith('dupl')]
-    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{iters-1}.json'
+    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
     print(f'Writing subgraph alignments to: {align_file}')
-    with open(align_file, 'w+', encoding='utf8') as f:
-        json.dump(alignments, f)
+    write_to_json(align_file, alignments)
 
     # pr.disable()
     # sortby = 'cumulative'
