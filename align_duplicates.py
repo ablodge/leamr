@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 from display import Display
 from models.subgraph_model import Subgraph_Model
-from models.utils import align_all
 from nlp_data import add_nlp_data
 from rule_based.subgraph_rules import postprocess_subgraph, postprocess_subgraph_english, clean_subgraph
 
@@ -152,7 +151,7 @@ def main():
             duplicate_alignments[k] = []
     all_alignments = {k:subgraph_alignments[k]+duplicate_alignments[k] for k in subgraph_alignments}
 
-    subgraph_alignments = align_all(subgraph_model, amrs, all_alignments)
+    subgraph_alignments = subgraph_model.align_all(amrs, all_alignments)
     print('align all', coverage(amrs, subgraph_alignments))
     for amr in amrs:
         amr.alignments = subgraph_alignments[amr.id] + duplicate_alignments[amr.id]

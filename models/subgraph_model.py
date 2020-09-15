@@ -1,38 +1,22 @@
-import json
 import math
-import sys
 from collections import Counter
 from statistics import stdev, mean
 
-from amr_utils.alignments import AMR_Alignment, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.alignments import AMR_Alignment
 
-from display import Display
+from models.alignment_model import Alignment_Model
 from models.distance_model import Skellam_Distance_Model
-from models.utils import align_all
-from nlp_data import add_nlp_data
 from rule_based.subgraph_rules import subgraph_fuzzy_align, subgraph_exact_align_english, postprocess_subgraph, \
     postprocess_subgraph_english, clean_subgraph
 
 ENGLISH = True
 
-class Subgraph_Model:
+class Subgraph_Model(Alignment_Model):
 
     def __init__(self, amrs, alpha=1, ignore_duplicates=True):
 
-        self.alpha = alpha
+        super().__init__(amrs, alpha)
         self.ignore_duplicates = ignore_duplicates
-        self.translation_count = {}
-        self.translation_total = 0
-        self.num_subgraphs = 1
-
-        self.tokens_count = Counter()
-        self.tokens_total = 0
-        for amr in amrs:
-            for span in amr.spans:
-                token_label = ' '.join(amr.lemmas[t] for t in span)
-                self.tokens_count[token_label] += 1
-        self.tokens_total = sum(self.tokens_count[t]+self.alpha for t in self.tokens_count)
 
         self.naive_subgraph_model = Naive_Subgraph_Model(tokens_count=self.tokens_count,
                                                          tokens_total=self.tokens_total,
@@ -40,8 +24,6 @@ class Subgraph_Model:
         self.naive_subgraph_model.update_parameters(amrs)
 
         self.distance_model = Skellam_Distance_Model()
-
-        self._trans_logp_memo = {}
 
 
     def base_logp(self, amr, alignments, align):
@@ -55,12 +37,11 @@ class Subgraph_Model:
         subgraph_label = self.get_alignment_label(amr, align.nodes)
         token_logp = math.log(self.tokens_count[token_label]+self.alpha) - math.log(self.tokens_total)
 
-        if (token_label, subgraph_label) in self._trans_logp_memo:
-            trans_logp = self._trans_logp_memo[(token_label, subgraph_label)]
-        elif token_label in self.translation_count and subgraph_label in self.translation_count[token_label]:
-            trans_logp = math.log(self.translation_count[token_label][subgraph_label]+self.alpha) - math.log(self.translation_total)
-            trans_logp -= token_logp
-        elif len(token_label.split())>1 and any(t in self.translation_count and subgraph_label in self.translation_count[t] for t in token_label.split()):
+        if (token_label, subgraph_label) in self._trans_logp_memo or \
+                token_label in self.translation_count and subgraph_label in self.translation_count[token_label]:
+            trans_logp = super().logp(amr, alignments, align)
+        elif len(token_label.split())>1 and \
+                any(t in self.translation_count and subgraph_label in self.translation_count[t] for t in token_label.split()):
             max_logp = float('-inf')
             for tok in token_label.split():
                 if tok not in self.translation_count: continue
@@ -71,9 +52,6 @@ class Subgraph_Model:
             trans_logp = max_logp
         else:
             trans_logp = self.naive_subgraph_model.logp(amr, align)
-
-        if (token_label, subgraph_label) not in self._trans_logp_memo:
-            self._trans_logp_memo[(token_label, subgraph_label)] = trans_logp
 
         return trans_logp
 
@@ -159,26 +137,13 @@ class Subgraph_Model:
         return alignments
 
     def update_parameters(self, amrs, alignments):
-        self.translation_count = {}
-        self.translation_total = 0
-        self._trans_logp_memo = {}
+        super().update_parameters(amrs, alignments)
 
         distances = []
-        subgraphs = set()
 
         for amr in amrs:
             if amr.id not in alignments:
                 continue
-            taken = set()
-            for align in alignments[amr.id]:
-                taken.update(align.tokens)
-                tokens = ' '.join(amr.lemmas[t] for t in align.tokens)
-                if tokens not in self.translation_count:
-                    self.translation_count[tokens] = Counter()
-                subgraph_label = self.get_alignment_label(amr, align.nodes)
-                self.translation_count[tokens][subgraph_label]+=1
-                subgraphs.add(subgraph_label)
-
             # distance stats
             for s, r, t in amr.edges:
                 sa = amr.get_alignment(alignments, node_id=s)
@@ -186,10 +151,6 @@ class Subgraph_Model:
                 if sa and ta:
                     dist = self.distance_model.distance(amr, sa.tokens, ta.tokens)
                     distances.append(dist)
-
-        self.translation_total = sum(self.translation_count[t][s] for t in self.translation_count for s in self.translation_count[t])
-        self.translation_total += self.alpha*len(self.tokens_count)*len(subgraphs)
-        self.num_subgraphs = len(subgraphs)
 
         distance_mean = mean(distances)
         distance_stdev = stdev(distances)
@@ -278,7 +239,7 @@ class Subgraph_Model:
         return list(unaligned)
 
     def readable_logp(self, amr, alignments, align):
-        subgraph = self.get_alignment_label(amr, align.nodes)
+        readable = super().readable_logp(amr, alignments, align)
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
         tokens_logp = math.log(self.tokens_count[token_label]+self.alpha) - math.log(self.tokens_total)
         subgraph_logp = self.naive_subgraph_model.subgraph_prior(amr, align)
@@ -286,21 +247,18 @@ class Subgraph_Model:
         logp1 = self.base_logp(amr, alignments, align)
         logp2 = logp1 + tokens_logp - subgraph_logp
         dist_logp = self.distance_logp(amr, alignments, align)
-        tokens_count = self.tokens_count[token_label]
         partial_scores = self.naive_subgraph_model.partial_logp(amr, align)
         subgraph_prior = self.naive_subgraph_model.subgraph_prior(amr, align)
-        score = self.logp(amr, alignments, align)
-        return {'tokens':token_label,
-                'subgraph':subgraph,
-                'score':score,
-                'logP(subgraph|tokens)':logp1,
-                'logP(tokens|subgraph)': logp2,
-                'logP(tokens)':tokens_logp,
-                'logP(subgraph)':subgraph_prior,
-                'logP(distance)':dist_logp,
-                'partial_logp':partial_scores,
-                'tokens_count': tokens_count,
-                }
+        readable.update(
+            {'logP(subgraph|tokens)':logp1,
+             'logP(tokens|subgraph)': logp2,
+             'logP(tokens)':tokens_logp,
+             'logP(subgraph)':subgraph_prior,
+             'logP(distance)':dist_logp,
+             'partial_logp':partial_scores,
+             }
+        )
+        return readable
 
 class Naive_Subgraph_Model:
 
@@ -455,54 +413,3 @@ class Naive_Subgraph_Model:
                     p = f'{edge}:{i}'
                 parts[p] = self.edge_conditional_logp(token_label, edge, source)
         return parts
-
-
-def main():
-
-    amr_file = sys.argv[1]
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
-
-    # amrs = amrs[:1000]
-
-    add_nlp_data(amrs, amr_file)
-
-    # import cProfile, pstats
-    # pr = cProfile.Profile()
-    # pr.enable()
-
-    align_model = Subgraph_Model(amrs)
-    iters = 10
-
-    for i in range(iters-1):
-        print(f'Epoch {i}')
-        alignments = align_all(align_model, amrs)
-        align_model.update_parameters(amrs, alignments)
-
-        Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
-
-        align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
-        print(f'Writing subgraph alignments to: {align_file}')
-        write_to_json(align_file, alignments)
-    i = iters - 1
-    print(f'Epoch {i}')
-    alignments = align_all(align_model, amrs)
-    align_model.update_parameters(amrs, alignments)
-
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
-
-    amrs_dict = {}
-    for amr in amrs:
-        amrs_dict[amr.id] = amr
-
-    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
-    print(f'Writing subgraph alignments to: {align_file}')
-    write_to_json(align_file, alignments)
-
-    # pr.disable()
-    # sortby = 'cumulative'
-    # ps = pstats.Stats(pr).sort_stats(sortby)
-    # ps.print_stats()
-
-if __name__=='__main__':
-    main()
