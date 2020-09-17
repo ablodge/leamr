@@ -30,10 +30,10 @@ class Gaussian_Distance_Model:
                 idx2 = i
             if idx1 is not None and idx2 is not None:
                 break
-        return (idx2 - idx1)/len(amr.tokens)
+        return (idx2 - idx1)/len(amr.spans)
 
     def logp(self, dist):
-        dist = round(dist, 6)
+        dist = round(dist, 4)
         max_dist = 100
         min_dist = -100
         if dist>max_dist: dist = max_dist
