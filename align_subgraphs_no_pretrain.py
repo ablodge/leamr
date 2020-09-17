@@ -18,10 +18,12 @@ def main():
 
     add_nlp_data(amrs, amr_file)
 
-    align_model = Subgraph_Model(amrs)
-    iters = 10
+    align_model = Subgraph_Model(amrs, ignore_duplicates=True)
+    iters = 3
 
-    for i in range(iters-1):
+    all_alignments = []
+
+    for i in range(iters):
         print(f'Epoch {i}')
         alignments = align_model.align_all(amrs)
         align_model.update_parameters(amrs, alignments)
@@ -31,20 +33,21 @@ def main():
         align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
         print(f'Writing subgraph alignments to: {align_file}')
         write_to_json(align_file, alignments)
-    i = iters - 1
-    print(f'Epoch {i}')
-    alignments = align_model.align_all(amrs)
-    align_model.update_parameters(amrs, alignments)
+        all_alignments.append(alignments)
 
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraphs.no-pretrain{i}.html')
-
-    amrs_dict = {}
+    all_alignments_diff = {}
     for amr in amrs:
-        amrs_dict[amr.id] = amr
+        all_alignments_diff[amr.id] = []
+        for span in amr.spans:
+            diff = [amr.get_alignment(alignments, token_id=span[0]).nodes for alignments in all_alignments]
+            diff = {i:nodes for i,nodes in enumerate(diff)}
+            if not all(nodes==diff[0] for i,nodes in diff.items()):
+                readable_diff = [align_model.get_alignment_label(amr, diff[i]) for i in diff]
+                all_alignments_diff[amr.id].append((span, diff,
+                                                    ' '.join(amr.lemmas[t] for t in span),
+                                                    readable_diff))
+    print()
 
-    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.no-pretrain{i}.json'
-    print(f'Writing subgraph alignments to: {align_file}')
-    write_to_json(align_file, alignments)
 
 if __name__=='__main__':
     main()

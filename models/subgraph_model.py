@@ -5,7 +5,7 @@ from statistics import stdev, mean
 from amr_utils.alignments import AMR_Alignment
 
 from models.alignment_model import Alignment_Model
-from models.distance_model import Skellam_Distance_Model
+from models.distance_model import Gaussian_Distance_Model
 from rule_based.subgraph_rules import subgraph_fuzzy_align, subgraph_exact_align_english, postprocess_subgraph, \
     postprocess_subgraph_english, clean_subgraph
 
@@ -23,7 +23,7 @@ class Subgraph_Model(Alignment_Model):
                                                          alpha=alpha)
         self.naive_subgraph_model.update_parameters(amrs)
 
-        self.distance_model = Skellam_Distance_Model()
+        self.distance_model = Gaussian_Distance_Model()
 
 
     def base_logp(self, amr, alignments, align):
@@ -108,7 +108,7 @@ class Subgraph_Model(Alignment_Model):
         else:
             logp += self.distance_model.logp(self.distance_model.distance_stdev)
         if child_dists:
-            dist = max(child_dists)
+            dist = sum(child_dists)/len(child_dists)
             logp += self.distance_model.logp(dist)
         else:
             logp += self.distance_model.logp(self.distance_model.distance_stdev)
