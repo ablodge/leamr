@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 class Alignment_Model:
 
-    def __init__(self, amrs, alpha=1):
+    def __init__(self, amrs, alpha=0.01):
 
         self.alpha = alpha
         self.translation_count = {}
@@ -29,34 +29,31 @@ class Alignment_Model:
         token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
 
         if (token_label, align_label) in self._trans_logp_memo:
-            trans_logp = self._trans_logp_memo[(token_label, align_label)]
-        else:
+            return self._trans_logp_memo[(token_label, align_label)]
+        elif token_label in self.translation_count:
             trans_logp = math.log(self.translation_count[token_label][align_label] + self.alpha) - math.log(self.translation_total)
             trans_logp -= token_logp
+        else:
+            trans_logp = math.log(self.alpha) - math.log(self.translation_total)
+            trans_logp -= token_logp
 
-        if (token_label, align_label) not in self._trans_logp_memo:
-            self._trans_logp_memo[(token_label, align_label)] = trans_logp
+        self._trans_logp_memo[(token_label, align_label)] = trans_logp
 
         return trans_logp
 
     def readable_logp(self, amr, alignments, align):
-        align_label = self.get_alignment_label(amr, align.nodes)
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-        tokens_logp = math.log(self.tokens_count[token_label]+self.alpha) - math.log(self.tokens_total)
         tokens_count = self.tokens_count[token_label]
         score = self.logp(amr, alignments, align)
-
         return {'tokens':token_label,
-                'label':align_label,
                 'score':score,
                 'tokens_count': tokens_count,
-                'P(tokens)':tokens_logp,
                 }
 
-    def get_alignment_label(self, amr, align):
-        return str(align)
+    def get_alignment_label(self, amr, ns):
+        return str(ns)
 
-    def get_initial_alignments(self, amrs):
+    def get_initial_alignments(self, amrs, preprocess=True):
         return {amr.id:[] for amr in amrs}
 
     def update_parameters(self, amrs, alignments):
@@ -68,9 +65,7 @@ class Alignment_Model:
         for amr in amrs:
             if amr.id not in alignments:
                 continue
-            taken = set()
             for align in alignments[amr.id]:
-                taken.update(align.tokens)
                 tokens = ' '.join(amr.lemmas[t] for t in align.tokens)
                 if tokens not in self.translation_count:
                     self.translation_count[tokens] = Counter()
@@ -82,14 +77,14 @@ class Alignment_Model:
         self.translation_total += self.alpha * len(self.tokens_count) * len(align_labels)
 
     def align(self, amr, alignments, n, unaligned=None):
-        return None, None
+        pass
 
     def get_unaligned(self, amr, alignments):
         return []
 
-    def align_all(self, amrs, alignments=None):
+    def align_all(self, amrs, alignments=None, preprocess=True):
         if alignments is None:
-            alignments = self.get_initial_alignments(amrs)
+            alignments = self.get_initial_alignments(amrs, preprocess)
 
         perplexity = 0
         N = 0
@@ -101,11 +96,12 @@ class Alignment_Model:
                 candidate_aligns = {}
 
                 for n in unaligned:
-                    best_align, best_score = self.align(amr, alignments, n, unaligned)
-                    if best_align is None: continue
-                    span = tuple(best_align.tokens)
-                    all_scores[(n, span)] = best_score
-                    candidate_aligns[(n, span)] = best_align
+                    aligns, scores = self.align(amr, alignments, n, unaligned, return_all=True)
+                    if aligns is None: continue
+                    # span = tuple(best_align.tokens)
+                    for span in aligns:
+                        all_scores[(n, span)] = scores[span]
+                        candidate_aligns[(n, span)] = aligns[span]
                 if not all_scores:
                     break
 
@@ -116,13 +112,13 @@ class Alignment_Model:
 
                 # old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
                 # readable = [(all_scores[(n,span)],
-                #             amr.nodes[n] if n in amr.nodes else n,
+                #             self.get_alignment_label(amr, [n]),
                 #              ' '.join(amr.lemmas[t] for t in span),
-                #              model.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-                #              model.readable_logp(amr, alignments, old_alignments[span]),
+                #              self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
+                #              self.readable_logp(amr, alignments, old_alignments[span]),
                 #              ) for n,span in all_scores.keys()]
                 # readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
-                # print()
+                # x = 0
 
                 # add node to alignment
                 for i, align in enumerate(alignments[amr.id]):

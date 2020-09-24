@@ -4,7 +4,7 @@ from amr_utils.alignments import AMR_Alignment
 from amr_utils.graph_utils import is_rooted_dag, get_rooted_components
 
 
-def postprocess_subgraph(amr, alignments, align):
+def postprocess_subgraph(amr, alignments, align, english=False):
     # Certain AMR patterns should always be aligned as a single subgraph, such as named entities.
     # This function adds any mising nodes based on several patterns.
 
@@ -50,8 +50,10 @@ def postprocess_subgraph(amr, alignments, align):
     #     if amr.nodes[n] == 'multi-sentence':
     #         if align.tokens[0] == len(amr.tokens)-1:
     #             align.nodes.clear()
+    if english:
+        _postprocess_subgraph_english(amr, alignments, align)
 
-def postprocess_subgraph_english(amr, alignments, align):
+def _postprocess_subgraph_english(amr, alignments, align):
     # postprocessing rules specific to English
     if not align.nodes:
         return
@@ -72,15 +74,35 @@ def postprocess_subgraph_english(amr, alignments, align):
                 next_tok = align.tokens[-1] + 1
                 if next_tok<len(amr.tokens) and amr.lemmas[next_tok].lower() in ['have','be']:
                     align.nodes.append(s)
+        if s in align.nodes and t not in align.nodes:
+            # E.g., "unimaginable"
+            if amr.nodes[t] == 'possible-01' and r==':ARG1-of' and not amr.get_alignment(alignments, node_id=s):
+                if any(amr.tokens[tok].lower().endswith('able') or amr.tokens[tok].lower().endswith('ible') for tok in
+                       align.tokens):
+                    align.nodes.append(t)
     for s,r,t in amr.edges:
         if t in align.nodes and s not in align.nodes:
             # E.g., "The city of Paris."
             if 'of' in [amr.tokens[t].lower() for t in align.tokens] and amr.nodes[s]=='mean-01' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
+        elif s in align.nodes and t not in align.nodes:
+            if r==':polarity' and amr.nodes[t]=='-' and not amr.get_alignment(alignments, node_id=t):
+                token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
+                if any(token_label.startswith(prefix) for prefix in ['un','non']) \
+                        and not any(token_label.startswith(prefix) for prefix in ['until','unite','union','under','nonce']):
+                    prev_tok = align.tokens[0] - 1
+                    if prev_tok < 0: prev_tok = 0
+                    if amr.lemmas[prev_tok] not in ['not',"n't"]:
+                        align.nodes.append(t)
 
-def clean_subgraph(amr, alignments, align):
+
+def clean_subgraph(amr, alignments, align, english=False):
     if len(align.nodes) == 1 and amr.nodes[align.nodes[0]]=='multi-sentence' and align.tokens == [len(amr.tokens)-1]:
         return None
+    if english:
+        if len(align.nodes) == 1 and amr.nodes[align.nodes[0]]=='person' \
+            and ' '.join(amr.lemmas[t].lower() for t in align.tokens) not in ['person','people']:
+            return None
 
     if align.nodes and not is_subgraph(amr, align.nodes):
         components = separate_components(amr, align)
@@ -98,16 +120,16 @@ def clean_subgraph(amr, alignments, align):
 
 
 time_re = re.compile('^[0-2]?\d:[0-5]\d$')
-def subgraph_fuzzy_align(amr, alignments):
+def fuzzy_align_subgraphs(amr, alignments, english=False):
 
     for n in amr.nodes:
         align = amr.get_alignment(alignments, node_id=n)
         if not align:
             # Try to align attributes in quotes by fuzzy match if only one match exists
-            if amr.nodes[n].startswith('"') and amr.nodes[n].endswith('"') or amr.nodes[n].isdigit():
+            if amr.nodes[n].startswith('"') and amr.nodes[n].endswith('"') or amr.nodes[n][0].isdigit():
                 label = amr.nodes[n].replace('"', '') #.replace("'",'')
                 candidate_strings = [label]
-                if len(label)<=1: continue
+
                 # E.g., "6:00" aligns to 6
                 if time_re.match(label):
                     label = label.split(':')[0]
@@ -160,8 +182,10 @@ def subgraph_fuzzy_align(amr, alignments):
                     span = candidate_tokens[0]
                     align = amr.get_alignment(alignments, token_id=span[0])
                     align.nodes.append(n)
+    if english:
+        _exact_align_subgraphs_english(amr, alignments)
 
-def subgraph_exact_align_english(amr, alignments):
+def _exact_align_subgraphs_english(amr, alignments):
 
     for n in amr.nodes:
         align = amr.get_alignment(alignments, node_id=n)
@@ -191,6 +215,13 @@ def subgraph_exact_align_english(amr, alignments):
                 candidate_tokens = [span for span in candidate_tokens if len(span) == 1 and amr.lemmas[span[0]].lower() in
                                     ['thus', 'since', 'because', 'cause', 'such', 'such that', 'so', 'therefore',
                                      'out of', 'due to', 'thanks to', 'reason', 'why', 'consequently']]
+            # exact match for polarity -
+            elif amr.nodes[n] == '-':
+                candidate_tokens = [span for span in amr.spans if not amr.get_alignment(alignments, token_id=span[0])]
+                candidate_tokens = [span for span in candidate_tokens if
+                                    len(span) == 1 and amr.lemmas[span[0]].lower() in
+                                    ['not', "n't", 'non', 'without', 'no', 'none', 'never', 'neither', 'no one']]
+            # United States
             elif amr.nodes[n] == 'name' and {amr.nodes[t].replace('"','') for s,r,t in amr.edges if s==n and r.startswith(':op')} in [
                 {'United', 'States'}, {'America'}, {'United', 'States', 'of', 'America'}]:
                 candidate_tokens = [span for span in amr.spans

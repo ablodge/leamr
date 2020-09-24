@@ -8,7 +8,7 @@ class Gaussian_Distance_Model:
     def __init__(self):
 
         self.distance_mean = 0
-        self.distance_stdev = 0.5
+        self.distance_stdev = 50
         self._distribution_memo = {}
 
     def update_parameters(self, mean, stdev):
@@ -30,14 +30,14 @@ class Gaussian_Distance_Model:
                 idx2 = i
             if idx1 is not None and idx2 is not None:
                 break
-        return (idx2 - idx1)/len(amr.spans)
+        return 100*(idx2 - idx1)/len(amr.spans)
 
     def logp(self, dist):
         dist = round(dist, 4)
-        max_dist = 100
-        min_dist = -100
-        if dist>max_dist: dist = max_dist
-        if dist<min_dist: dist=min_dist
+        # max_dist = 100
+        # min_dist = -100
+        # if dist>max_dist: dist = max_dist
+        # if dist<min_dist: dist=min_dist
         if dist in self._distribution_memo:
             logp = self._distribution_memo[dist]
         else:
@@ -54,7 +54,7 @@ class Skellam_Distance_Model:
     def __init__(self):
 
         self.distance_mean = 0
-        self.distance_stdev = 5
+        self.distance_stdev = 10
         self._distribution_memo = {}
         self.mu2 = (self.distance_stdev ** 2 - self.distance_mean) / 2
         self.mu1 = self.distance_mean + self.mu2
