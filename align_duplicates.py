@@ -2,13 +2,12 @@ import sys
 
 from amr_utils.alignments import AMR_Alignment, load_from_json, write_to_json
 from amr_utils.amr_readers import JAMR_AMR_Reader
-from amr_utils.graph_utils import breadth_first_edges
 from tqdm import tqdm
 
 from display import Display
 from models.subgraph_model import Subgraph_Model
 from nlp_data import add_nlp_data
-from rule_based.subgraph_rules import postprocess_subgraph, postprocess_subgraph_english, clean_subgraph
+from rule_based.subgraph_rules import postprocess_subgraph, clean_subgraph
 
 ENGLISH = True
 
@@ -22,9 +21,8 @@ def add_alignment(amr, alignments, align):
             for n in old_align.nodes:
                 if n not in align.nodes:
                     align.nodes.append(n)
-            postprocess_subgraph(amr, alignments, align)
-            if ENGLISH: postprocess_subgraph_english(amr, alignments, align)
-            clean_subgraph(amr, alignments, align)
+            postprocess_subgraph(amr, alignments, align, english=ENGLISH)
+            clean_subgraph(amr, alignments, align, english=ENGLISH)
             return
     raise Exception('Alignment not found!')
 
@@ -164,7 +162,7 @@ def main():
     for amr in amrs:
         amrs_dict[amr.id] = amr
 
-    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments2.json'
+    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.all.json'
     print(f'Writing subgraph alignments to: {align_file}')
     write_to_json(align_file, subgraph_alignments)
 
