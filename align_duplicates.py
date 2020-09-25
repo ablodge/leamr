@@ -41,13 +41,16 @@ def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments,
     taken_spans = set()
     taken_nodes = set()
     ignore_list = []
-    for j,n in enumerate(candidate_nodes):
+    if len(candidate_nodes)>len(candidate_spans):
         for s,r,t in amr.edges:
-            if t == n and amr.nodes[s] in ['include-91','same-01','instead-of-91']:
-                if any(t2==s and s2 in candidate_nodes for s2,r2,t2 in amr.edges):
-                    ignore_list.append(j)
-                elif any(s2==s and t2!=t and t2 in candidate_nodes for s2,r2,t2 in amr.edges):
-                    ignore_list.append(j)
+            if amr.nodes[s] in ['include-91','same-01','instead-of-91','and','or'] and r.endswith('1') and t in candidate_nodes:
+                for s2, r2, t2 in amr.edges:
+                    if s2==s and t2!=t and t2 in candidate_nodes:
+                        ignore_list.append(candidate_nodes.index(t2))
+            elif s in candidate_nodes and r.endswith('1-of') and amr.nodes[t] in ['include-91','same-01','instead-of-91','and','or']:
+                for s2, r2, t2 in amr.edges:
+                    if s2==t and t2!=s and t2 in candidate_nodes:
+                        ignore_list.append(candidate_nodes.index(t2))
 
     for i,j in best_scores:
         if i in taken_spans or j in taken_nodes: continue
@@ -91,7 +94,7 @@ def coverage(amrs, alignments):
 
 def main():
     amr_file = sys.argv[1]
-    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments.no-pretrain0.json'
+    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments2.json'
 
     cr = JAMR_AMR_Reader()
     amrs = cr.load(amr_file, remove_wiki=True)
@@ -107,12 +110,14 @@ def main():
     subgraph_model.update_parameters(amrs, subgraph_alignments)
 
     # lower the importance of distance to better handle reentrancy
-    dist_stdev = subgraph_model.distance_model.distance_stdev
-    dist_mean = subgraph_model.distance_model.distance_mean
-    subgraph_model.distance_model.update_parameters(dist_mean, 2*dist_stdev)
+    # dist_stdev = subgraph_model.distance_model.distance_stdev
+    # dist_mean = subgraph_model.distance_model.distance_mean
+    # subgraph_model.distance_model.update_parameters(dist_mean, 2*dist_stdev)
 
     for amr in tqdm(amrs, file=sys.stdout):
         duplicate_alignments[amr.id] = []
+
+        # find duplicate nodes
         duplicate_nodes = {}
         unaligned = subgraph_model.get_unaligned(amr, subgraph_alignments)
         for n in amr.nodes:
@@ -123,25 +128,37 @@ def main():
                 duplicate_nodes[node_label] = []
             duplicate_nodes[amr.nodes[n]].append(n)
         duplicate_nodes = {node_label:duplicate_nodes[node_label] for node_label in duplicate_nodes if len(duplicate_nodes[node_label])>1}
-        # find_duplicate_subgraphs(amr, duplicate_nodes)
-        candidate_scores = {}
-        candidate_spans = {}
-        for node_label, candidate_nodes in duplicate_nodes.items():
-            candidate_tokens = set()
-            score = float('-inf')
-            for n in candidate_nodes:
-                best_align, best_score = subgraph_model.align(amr, subgraph_alignments, n, unaligned)
-                if best_align is None: continue
-                candidate_tokens.add(' '.join(amr.lemmas[t] for t in best_align.tokens))
-                if best_score > score:
-                    score = best_score
-            candidate_scores[node_label] = score
-            candidate_spans[node_label] = [span for span in amr.spans if ' '.join(amr.lemmas[t] for t in span) in candidate_tokens]
-        for node_label in sorted(candidate_scores.keys(), key=lambda x:candidate_scores[x], reverse=True):
+
+        # align duplicate nodes
+        duplicates_todo = {node_label for node_label in duplicate_nodes}
+        while duplicates_todo:
+            rank = {}
+            candidate_tokens = {node_label:set() for node_label in duplicates_todo}
+            readable = []
+            for node_label, candidate_nodes in duplicate_nodes.items():
+                if node_label not in duplicates_todo: continue
+                for n in candidate_nodes:
+                    best_align, best_score = subgraph_model.align(amr, subgraph_alignments, n)
+                    if best_align is None:
+                        continue
+                    candidate_tokens[node_label].add(' '.join(amr.lemmas[t].lower() for t in best_align.tokens))
+                    rank[(node_label,n)] = best_score
+                    # readable.append((best_score,
+                    #                  best_align.tokens,
+                    #                  node_label,
+                    #                  subgraph_model.readable_logp(amr, subgraph_alignments, best_align)))
+                exact_match = node_label.replace('-',' ')
+                if exact_match[-1].isdigit():
+                    exact_match = ' '.join(exact_match.split()[:-1])
+                candidate_tokens[node_label].add(exact_match)
+            best_node_label, n = max(rank.keys(), key=lambda x:rank[x])
+            candidate_spans = [span for span in amr.spans if ' '.join(amr.lemmas[t].lower() for t in span) in candidate_tokens[best_node_label]]
             resolve_duplicate_alignments(amr, subgraph_alignments,
                                          duplicate_alignments,
-                                         candidate_spans[node_label], duplicate_nodes[node_label], subgraph_model)
-    print('resolve duplicates', coverage(amrs, subgraph_alignments))
+                                         candidate_spans, duplicate_nodes[best_node_label], subgraph_model)
+            # readable = [r for r in sorted(readable, key=lambda x:x[0], reverse=True)]
+            duplicates_todo.remove(best_node_label)
+    print('align duplicates', coverage(amrs, subgraph_alignments))
     subgraph_model.update_parameters(amrs, subgraph_alignments)
 
     for k in subgraph_alignments:
