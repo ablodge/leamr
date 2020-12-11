@@ -116,8 +116,8 @@ def main():
         print('Warning: Failed to parse coreference. '
               'Please install neuralcoref from source: https://github.com/huggingface/neuralcoref#install-neuralcoref-from-source', file=sys.stderr)
 
-    amr_enum = [_ for _ in enumerate(amrs)]
-    for amr_idx, amr in tqdm(amr_enum):
+    enum_amrs = [_ for _ in enumerate(amrs)]
+    for amr_idx, amr in tqdm(enum_amrs):
         tokens = amr.tokens
         doc = nlp(' '.join(tokens))
         start_idx = {}
@@ -150,6 +150,7 @@ def main():
                     stanza_pos[start] = word.xpos
             for e in s.entities:
                 stanza_entity_type.append(e.type)
+                ent_type = e.type
                 span = []
                 for t in e.tokens:
                     start = t.start_char
@@ -157,30 +158,35 @@ def main():
                 # name = ' '.join(amr.tokens[convert_ids[t]] for t in span)
                 # type = e.type
                 pos = [stanza_pos[t] for t in span]
-                if pos[0] in ['DT','PRP$','RB','JJ']:
-                    while pos and pos[0] in ['DT','PRP$','RB','JJ']:
+                if pos[0] in ['DT','PDT','PRP$','RB','RP','JJ','JJR','JJS','IN']:
+                    while pos and pos[0] in ['DT','PDT','PRP$','RB','RP','JJ','JJR','JJS','IN']:
                         pos = pos[1:]
                         span = span[1:]
                     if len(span) == 0:
                         stanza_entity_type.pop()
                         continue
-                if pos and pos[-1] == 'POS':
+                if pos and pos[-1] in ['POS','RB','RBR','RBS']:
                     span = span[:-1]
                     if len(span) == 0:
                         stanza_entity_type.pop()
                         continue
-                next_tok = convert_ids[span[-1]]
-                next_tok = [s for s,t in convert_ids.items() if t==next_tok+1]
-                if next_tok:
-                    next_tok = next_tok[0]
-                    next_pos = stanza_pos[next_tok]
-                    # next_name = amr.tokens[convert_ids[next_tok]]
-                    if next_pos == 'NN':
-                        span.append(next_tok)
+                # next_tok = convert_ids[span[-1]]
+                # next_tok = [s for s,t in convert_ids.items() if t==next_tok+1]
+                # if next_tok:
+                #     next_tok = next_tok[0]
+                #     next_pos = stanza_pos[next_tok]
+                #     # next_name = amr.tokens[convert_ids[next_tok]]
+                #     if next_pos == 'NN':
+                #         span.append(next_tok)
                 if len(span) == 1:
                     stanza_entity_type.pop()
                     continue
                 stanza_entity_spans.append(span)
+                # if ent_type in ['DATE','TIME','MONEY','QUANTITY']:
+                #     print()
+                #     print(ent_type, ' '.join(amr.tokens[convert_ids[i]] for i in span))
+                #     print()
+
         lemmas = ['' for _ in amr.tokens]
         for i in stanza_lemmas:
             lemmas[convert_ids[i]] += stanza_lemmas[i]
@@ -267,6 +273,10 @@ def main():
     if coreferences:
         with open(filename+'.coref.json', 'w+',encoding='utf8') as f:
             json.dump(coreferences, f)
+
+    # for amr in amrs:
+    #     print(' '.join('_'.join(amr.tokens[t] for t in span) for span in multi_word_spans[amr.id]))
+    #     print()
 
 
 

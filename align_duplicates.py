@@ -30,6 +30,7 @@ def add_alignment(amr, alignments, align):
 def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments, candidate_spans, candidate_nodes, model):
     scores = {}
     aligns = {}
+    all_align = {amr.id: subgraph_alignments[amr.id] + duplicate_alignments[amr.id]}
 
     for i,span in enumerate(candidate_spans):
         for j,n in enumerate(candidate_nodes):
@@ -43,7 +44,7 @@ def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments,
     ignore_list = []
     if len(candidate_nodes)>len(candidate_spans):
         for s,r,t in amr.edges:
-            if amr.nodes[s] in ['include-91','same-01','instead-of-91','and','or'] and r.endswith('1') and t in candidate_nodes:
+            if amr.nodes[s] in ['include-91','same-01','instead-of-91','resemble-01','and','or'] and r.endswith('1') and t in candidate_nodes:
                 for s2, r2, t2 in amr.edges:
                     if s2==s and t2!=t and t2 in candidate_nodes:
                         ignore_list.append(candidate_nodes.index(t2))
@@ -51,6 +52,10 @@ def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments,
                 for s2, r2, t2 in amr.edges:
                     if s2==t and t2!=s and t2 in candidate_nodes:
                         ignore_list.append(candidate_nodes.index(t2))
+
+    for j,n in enumerate(candidate_nodes):
+        if amr.get_alignment(all_align, node_id=n):
+            taken_nodes.add(j)
 
     for i,j in best_scores:
         if i in taken_spans or j in taken_nodes: continue
@@ -60,14 +65,14 @@ def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments,
         taken_spans.add(i)
         taken_nodes.add(j)
 
-    if len(taken_spans) < len(candidate_spans):
-        for i, j in best_scores:
-            if i in taken_spans and j in taken_nodes: continue
-            if i not in taken_spans:
-                align = aligns[(i, j)].copy()
-                align.type = 'dupl-span'
-                duplicate_alignments[amr.id].append(align)
-                taken_spans.add(i)
+    # if len(taken_spans) < len(candidate_spans):
+    #     for i, j in best_scores:
+    #         if i in taken_spans and j in taken_nodes: continue
+    #         if i not in taken_spans:
+    #             align = aligns[(i, j)].copy()
+    #             align.type = 'dupl-span'
+    #             duplicate_alignments[amr.id].append(align)
+    #             taken_spans.add(i)
     if len(taken_nodes) < len(candidate_nodes):
         for i, j in best_scores:
             if i in taken_spans and j in taken_nodes: continue
@@ -76,6 +81,8 @@ def resolve_duplicate_alignments(amr, subgraph_alignments, duplicate_alignments,
                 if len(align.nodes)==1 and amr.nodes[align.nodes[0]] in ['thing','and','-','person']:
                     continue
                 align.type = 'dupl-subgraph'
+                replaced_align = amr.get_alignment(subgraph_alignments, token_id=candidate_spans[i][0])
+                align.nodes = [n for n in align.nodes if n not in replaced_align.nodes]
                 duplicate_alignments[amr.id].append(align)
                 taken_nodes.add(j)
 
@@ -91,28 +98,8 @@ def coverage(amrs, alignments):
             total+=1
     return f'{100*coverage_count/total:.2f}%'
 
-
-def main():
-    amr_file = sys.argv[1]
-    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments2.json'
-
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
-    if TRAIN_MAX:
-        amrs = amrs[:TRAIN_MAX]
-
-    add_nlp_data(amrs, amr_file)
-
-    subgraph_alignments = load_from_json(align_file, amrs)
+def align_duplicates(amrs, subgraph_model, subgraph_alignments):
     duplicate_alignments = {}
-
-    subgraph_model = Subgraph_Model(amrs, ignore_duplicates=False)
-    subgraph_model.update_parameters(amrs, subgraph_alignments)
-
-    # lower the importance of distance to better handle reentrancy
-    # dist_stdev = subgraph_model.distance_model.distance_stdev
-    # dist_mean = subgraph_model.distance_model.distance_mean
-    # subgraph_model.distance_model.update_parameters(dist_mean, 2*dist_stdev)
 
     for amr in tqdm(amrs, file=sys.stdout):
         duplicate_alignments[amr.id] = []
@@ -153,9 +140,10 @@ def main():
                 candidate_tokens[node_label].add(exact_match)
             best_node_label, n = max(rank.keys(), key=lambda x:rank[x])
             candidate_spans = [span for span in amr.spans if ' '.join(amr.lemmas[t].lower() for t in span) in candidate_tokens[best_node_label]]
+            candidate_nodes = duplicate_nodes[best_node_label]
             resolve_duplicate_alignments(amr, subgraph_alignments,
                                          duplicate_alignments,
-                                         candidate_spans, duplicate_nodes[best_node_label], subgraph_model)
+                                         candidate_spans, candidate_nodes, subgraph_model)
             # readable = [r for r in sorted(readable, key=lambda x:x[0], reverse=True)]
             duplicates_todo.remove(best_node_label)
     print('align duplicates', coverage(amrs, subgraph_alignments))
@@ -164,12 +152,40 @@ def main():
     for k in subgraph_alignments:
         if k not in duplicate_alignments:
             duplicate_alignments[k] = []
-    all_alignments = {k:subgraph_alignments[k]+duplicate_alignments[k] for k in subgraph_alignments}
 
-    subgraph_alignments = subgraph_model.align_all(amrs, all_alignments)
-    print('align all', coverage(amrs, subgraph_alignments))
+    all_alignments = {}
+    for k in subgraph_alignments:
+        all_alignments[k] = subgraph_alignments[k]+duplicate_alignments[k]
+
+    all_alignments = subgraph_model.align_all(amrs, all_alignments)
+    for k in subgraph_alignments:
+        subgraph_alignments[k] = [align for align in all_alignments[k] if align.type=='subgraph']
+
+    print('align all', coverage(amrs, subgraph_alignments), '+', coverage(amrs, duplicate_alignments))
     for amr in amrs:
-        amr.alignments = subgraph_alignments[amr.id] + duplicate_alignments[amr.id]
+        amr.alignments = all_alignments[amr.id]
+
+    return subgraph_alignments, duplicate_alignments
+
+
+
+def main():
+    amr_file = sys.argv[1]
+    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments.tmp1.json'
+
+    cr = JAMR_AMR_Reader()
+    amrs = cr.load(amr_file, remove_wiki=True)
+    if TRAIN_MAX:
+        amrs = amrs[:TRAIN_MAX]
+
+    add_nlp_data(amrs, amr_file)
+
+    subgraph_alignments = load_from_json(align_file, amrs)
+
+    subgraph_model = Subgraph_Model(amrs, ignore_duplicates=False)
+    subgraph_model.update_parameters(amrs, subgraph_alignments)
+
+    subgraph_alignments, duplicate_alignments = align_duplicates(amrs, subgraph_model, subgraph_alignments)
 
     display_file = amr_file.replace('.txt', '') + '.duplicates.html'
     print(f'Creating alignments display file: {display_file}')
@@ -179,7 +195,12 @@ def main():
     for amr in amrs:
         amrs_dict[amr.id] = amr
 
-    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.all.json'
+    for amr_id in subgraph_alignments:
+        for align in subgraph_alignments[amr_id]:
+            if align.type!='subgraph':
+                raise Exception('Incorrect alignment format!')
+
+    align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.json'
     print(f'Writing subgraph alignments to: {align_file}')
     write_to_json(align_file, subgraph_alignments)
 

@@ -14,11 +14,11 @@ def main():
     cr = JAMR_AMR_Reader()
     amrs = cr.load(amr_file, remove_wiki=True)
 
-    amrs = amrs[:1000]
+    # amrs = amrs[:1000]
 
     add_nlp_data(amrs, amr_file)
 
-    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments.no-pretrain0.json'
+    align_file = sys.argv[1].replace('.txt', '') + '.subgraph_alignments.all.json'
     subgraph_alignments = load_from_json(align_file, amrs)
 
     align_model = Relation_Model(amrs, subgraph_alignments)

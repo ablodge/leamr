@@ -28,9 +28,9 @@ def postprocess_subgraph(amr, alignments, align, english=False):
                 align.nodes.append(s)
             elif amr.nodes[s] == 'have-rel-role-91' and r==':ARG2' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
-        elif s in align.nodes and t not in align.nodes:
-            if r==':name' and not amr.get_alignment(alignments, node_id=t):
-                align.nodes.append(t)
+        # elif s in align.nodes and t not in align.nodes:
+        #     if r==':name' and not amr.get_alignment(alignments, node_id=t):
+        #         align.nodes.append(t)
     # Second pass
     for s,r,t in amr.edges:
         if t in align.nodes and s not in align.nodes:
@@ -123,10 +123,10 @@ time_re = re.compile('^[0-2]?\d:[0-5]\d$')
 def fuzzy_align_subgraphs(amr, alignments, english=False):
 
     for n in amr.nodes:
-        align = amr.get_alignment(alignments, node_id=n)
-        if not align:
-            # Try to align attributes in quotes by fuzzy match if only one match exists
-            if amr.nodes[n].startswith('"') and amr.nodes[n].endswith('"') or amr.nodes[n][0].isdigit():
+        # Try to align attributes in quotes by fuzzy match if only one match exists
+        if amr.nodes[n].startswith('"') and amr.nodes[n].endswith('"') or amr.nodes[n][0].isdigit():
+            align = amr.get_alignment(alignments, node_id=n)
+            if not align:
                 label = amr.nodes[n].replace('"', '') #.replace("'",'')
                 candidate_strings = [label]
 
@@ -152,18 +152,24 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
                     if any(amr.nodes[n2]==amr.nodes[n] for n2 in align.nodes):
                         continue
                     align.nodes.append(n)
-
-            # Align other concepts to tokens by fuzzy match if only one exists
-            elif amr.nodes[n][0].isalpha() and not amr.nodes[n].endswith('-91') and not amr.get_alignment(alignments, node_id=n):
+    for n in amr.nodes:
+        # Align other concepts to tokens by fuzzy match if only one exists
+        if amr.nodes[n][0].isalpha() and not amr.nodes[n].endswith('-91') and not amr.get_alignment(alignments, node_id=n):
+            align = amr.get_alignment(alignments, node_id=n)
+            if not align:
                 label = amr.nodes[n]
                 unaligned_tokens = [span for span in amr.spans if not amr.get_alignment(alignments, token_id=span[0])]
                 found = False
                 for prefix_size in [6,5,4]:
-                    candidate_tokens = [span for span in unaligned_tokens if '-'.join(amr.lemmas[t] for t in span)[:prefix_size]==label[:prefix_size]]
+                    candidate_tokens = [span for span in unaligned_tokens
+                                        if '-'.join(amr.lemmas[t] for t in span)[:prefix_size]==label[:prefix_size]
+                                        or '-'.join(amr.lemmas[t] for t in span)[:prefix_size]==label.split('-')[0][:prefix_size]]
                     if len(candidate_tokens)!=1:
                         continue
                     candidate_nodes = [n2 for n2 in amr.nodes if amr.nodes[n2][0].isalpha() and not amr.get_alignment(alignments, node_id=n2) and
-                                       not amr.nodes[n2].endswith('-91') and amr.nodes[n2][:prefix_size]==label[:prefix_size]]
+                                       not amr.nodes[n2].endswith('-91')]
+                    candidate_nodes = [n2 for n2 in candidate_nodes if amr.nodes[n2][:prefix_size]==label[:prefix_size]
+                                       or amr.nodes[n2].split('-')[0][:prefix_size]==label.split('-')[0][:prefix_size]]
                     if len(candidate_nodes)!=1:
                         continue
                     found = True

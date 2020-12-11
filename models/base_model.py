@@ -25,7 +25,7 @@ class Alignment_Model:
 
     def logp(self, amr, alignments, align):
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-        align_label = self.get_alignment_label(amr, align.nodes)
+        align_label = self.get_alignment_label(amr, align)
         token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
 
         if (token_label, align_label) in self._trans_logp_memo:
@@ -69,14 +69,14 @@ class Alignment_Model:
                 tokens = ' '.join(amr.lemmas[t] for t in align.tokens)
                 if tokens not in self.translation_count:
                     self.translation_count[tokens] = Counter()
-                align_label = self.get_alignment_label(amr, align.nodes)
+                align_label = self.get_alignment_label(amr, align)
                 align_labels.add(align_label)
                 self.translation_count[tokens][align_label] += 1
 
         self.translation_total = sum(self.translation_count[t][s] for t in self.translation_count for s in self.translation_count[t])
         self.translation_total += self.alpha * len(self.tokens_count) * len(align_labels)
 
-    def align(self, amr, alignments, n, unaligned=None):
+    def align(self, amr, alignments, n, unaligned=None, return_all=False):
         pass
 
     def get_unaligned(self, amr, alignments):
@@ -110,19 +110,21 @@ class Alignment_Model:
                 span = list(span)
                 new_align = candidate_aligns[best]
 
-                # old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
-                # readable = [(all_scores[(n,span)],
-                #             self.get_alignment_label(amr, [n]),
-                #              ' '.join(amr.lemmas[t] for t in span),
-                #              self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-                #              self.readable_logp(amr, alignments, old_alignments[span]),
-                #              ) for n,span in all_scores.keys()]
-                # readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
-                # x = 0
+                old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
+                readable = [(all_scores[(n,span)],
+                            self.get_alignment_label(amr, candidate_aligns[(n,span)]),
+                             ' '.join(amr.lemmas[t] for t in span),
+                             self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
+                             self.readable_logp(amr, alignments, old_alignments[span]),
+                             ) for n,span in all_scores.keys()]
+                readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
+                x = 0
 
                 # add node to alignment
                 for i, align in enumerate(alignments[amr.id]):
-                    if align.tokens == span and not align.type.startswith('dupl'):
+                    if align.tokens == span and align.type == new_align.type:
+                        if align.type == 'dupl-subgraph' and any(n not in new_align.nodes for n in align.nodes):
+                            continue
                         alignments[amr.id][i] = new_align
                         break
 
