@@ -146,7 +146,7 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
                             tokens.append(tok.replace(',',''))
                     if any(l in tokens for l in candidate_strings):
                         candidate_spans.append(span)
-                if len(candidate_spans) == 1:
+                if len(candidate_spans) == 1 or (candidate_spans and any(amr.nodes[s]=='name' and r.startswith(':op') and t==n for s,r,t in amr.edges)):
                     span = candidate_spans[0]
                     align = amr.get_alignment(alignments, token_id=span[0])
                     if any(amr.nodes[n2]==amr.nodes[n] for n2 in align.nodes):
@@ -227,6 +227,10 @@ def _exact_align_subgraphs_english(amr, alignments):
                 candidate_tokens = [span for span in candidate_tokens if
                                     len(span) == 1 and amr.lemmas[span[0]].lower() in
                                     ['not', "n't", 'non', 'without', 'no', 'none', 'never', 'neither', 'no one']]
+            # exact match for mean-01
+            elif amr.nodes[n] == 'mean-01':
+                candidate_tokens = [span for span in amr.spans if not amr.get_alignment(alignments, token_id=span[0])]
+                candidate_tokens = [span for span in candidate_tokens if len(span) == 1 and amr.lemmas[span[0]].lower() in [':']]
             # United States
             elif amr.nodes[n] == 'name' and {amr.nodes[t].replace('"','') for s,r,t in amr.edges if s==n and r.startswith(':op')} in [
                 {'United', 'States'}, {'America'}, {'United', 'States', 'of', 'America'}]:

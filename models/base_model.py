@@ -24,22 +24,7 @@ class Alignment_Model:
         self._trans_logp_memo = {}
 
     def logp(self, amr, alignments, align):
-        token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-        align_label = self.get_alignment_label(amr, align)
-        token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
-
-        if (token_label, align_label) in self._trans_logp_memo:
-            return self._trans_logp_memo[(token_label, align_label)]
-        elif token_label in self.translation_count:
-            trans_logp = math.log(self.translation_count[token_label][align_label] + self.alpha) - math.log(self.translation_total)
-            trans_logp -= token_logp
-        else:
-            trans_logp = math.log(self.alpha) - math.log(self.translation_total)
-            trans_logp -= token_logp
-
-        self._trans_logp_memo[(token_label, align_label)] = trans_logp
-
-        return trans_logp
+        return 0
 
     def readable_logp(self, amr, alignments, align):
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
@@ -70,6 +55,8 @@ class Alignment_Model:
                 if tokens not in self.translation_count:
                     self.translation_count[tokens] = Counter()
                 align_label = self.get_alignment_label(amr, align)
+                if align_label is None:
+                    continue
                 align_labels.add(align_label)
                 self.translation_count[tokens][align_label] += 1
 
@@ -110,15 +97,15 @@ class Alignment_Model:
                 span = list(span)
                 new_align = candidate_aligns[best]
 
-                old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
-                readable = [(all_scores[(n,span)],
-                            self.get_alignment_label(amr, candidate_aligns[(n,span)]),
-                             ' '.join(amr.lemmas[t] for t in span),
-                             self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-                             self.readable_logp(amr, alignments, old_alignments[span]),
-                             ) for n,span in all_scores.keys()]
-                readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
-                x = 0
+                # old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
+                # readable = [(all_scores[(n,span)],
+                #             self.get_alignment_label(amr, candidate_aligns[(n,span)]),
+                #              ' '.join(amr.lemmas[t] for t in span),
+                #              self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
+                #              self.readable_logp(amr, alignments, old_alignments[span]),
+                #              ) for n,span in all_scores.keys()]
+                # readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
+                # x = 0
 
                 # add node to alignment
                 for i, align in enumerate(alignments[amr.id]):
@@ -131,12 +118,13 @@ class Alignment_Model:
                 unaligned = self.get_unaligned(amr, alignments)
 
             amr.alignments = alignments[amr.id]
+            tally = 0
             for align in alignments[amr.id]:
                 logp = self.logp(amr, alignments, align)
-                p = math.exp(logp)
-                ent = - p * math.log(p, 2) if p > 0 else 0
-                perplexity += math.pow(2, ent)
-                N += 1
+                if math.isinf(logp): continue
+                tally -= logp/math.log(2.0)
+            perplexity += math.pow(2.0, tally/len(alignments[amr.id]))
+            N += 1
         perplexity /= N
         print(f'Perplexity: {perplexity}')
         return alignments
