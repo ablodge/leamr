@@ -24,10 +24,17 @@ class Null_Model:
         for spans in amr.coref:
             if any(token_idx in span for span in spans[1:]):
                 return math.log(0.5)
-        # repetition
-        for span in amr.spans:
-            if span[0]!=token_idx and ' '.join(amr.lemmas[t] for t in span)==token_label and rank>=4:
-                return math.log(0.5)
+        # parentheses
+        if '(' in amr.tokens and ')' in amr.tokens:
+            start_parens = [i for i in range(len(amr.tokens)) if amr.tokens[i]=='(']
+            end_parens = [i for i in range(len(amr.tokens)) if amr.tokens[i]==')']
+            for start, end in zip(start_parens, end_parens):
+                if start <= token_idx <= end:
+                    return math.log(0.5)
+        # # repetition
+        # for span in amr.spans:
+        #     if span[0]!=token_idx and ' '.join(amr.lemmas[t] for t in span)==token_label and rank>=4:
+        #         return math.log(0.5)
         p = 1 / (rank)
         logp = 0.5 * math.log(p)
         logp = max(logp, math.log(0.01))
@@ -39,7 +46,6 @@ class Null_Model:
             p = 1 / math.sqrt(rank)
             total += p*self.tokens_count[tok]
         return total
-
 
     def inductive_bias(self, token_label):
         return 0.0

@@ -1,4 +1,3 @@
-import math
 import sys
 from collections import Counter
 
@@ -7,9 +6,10 @@ from tqdm import tqdm
 
 class Alignment_Model:
 
-    def __init__(self, amrs, alpha=0.01):
+    def __init__(self, amrs, alpha=0.01, smooth_translation=False):
 
         self.alpha = alpha
+        self.smooth_translation = smooth_translation
         self.translation_count = {}
         self.translation_total = 0
 
@@ -19,7 +19,8 @@ class Alignment_Model:
             for span in amr.spans:
                 token_label = ' '.join(amr.lemmas[t] for t in span)
                 self.tokens_count[token_label] += 1
-        self.tokens_total = sum(self.tokens_count[t] + self.alpha for t in self.tokens_count)
+        self.tokens_total = sum(self.tokens_count[t] for t in self.tokens_count)
+        self.tokens_total += self.alpha*(len(self.tokens_count)+1)
 
         self._trans_logp_memo = {}
 
@@ -46,7 +47,6 @@ class Alignment_Model:
         self.translation_total = 0
         self._trans_logp_memo = {}
 
-        align_labels = set()
         for amr in amrs:
             if amr.id not in alignments:
                 continue
@@ -57,11 +57,11 @@ class Alignment_Model:
                 align_label = self.get_alignment_label(amr, align)
                 if align_label is None:
                     continue
-                align_labels.add(align_label)
                 self.translation_count[tokens][align_label] += 1
 
         self.translation_total = sum(self.translation_count[t][s] for t in self.translation_count for s in self.translation_count[t])
-        self.translation_total += self.alpha * len(self.tokens_count) * len(align_labels)
+        if self.smooth_translation:
+            self.translation_total += self.alpha*sum(len(self.translation_count[t])+1 for t in self.translation_count)
 
     def align(self, amr, alignments, n, unaligned=None, return_all=False):
         pass
@@ -73,8 +73,6 @@ class Alignment_Model:
         if alignments is None:
             alignments = self.get_initial_alignments(amrs, preprocess)
 
-        perplexity = 0
-        N = 0
         for amr in tqdm(amrs, file=sys.stdout):
             unaligned = self.get_unaligned(amr, alignments)
 
@@ -108,23 +106,19 @@ class Alignment_Model:
                 # x = 0
 
                 # add node to alignment
+                found = False
                 for i, align in enumerate(alignments[amr.id]):
                     if align.tokens == span and align.type == new_align.type:
-                        if align.type == 'dupl-subgraph' and any(n not in new_align.nodes for n in align.nodes):
+                        if align.type == 'dupl-subgraph':
                             continue
                         alignments[amr.id][i] = new_align
+                        found = True
                         break
+                if not found:
+                    alignments[amr.id].append(new_align)
 
                 unaligned = self.get_unaligned(amr, alignments)
 
             amr.alignments = alignments[amr.id]
-            tally = 0
-            for align in alignments[amr.id]:
-                logp = self.logp(amr, alignments, align)
-                if math.isinf(logp): continue
-                tally -= logp/math.log(2.0)
-            perplexity += math.pow(2.0, tally/len(alignments[amr.id]))
-            N += 1
-        perplexity /= N
-        print(f'Perplexity: {perplexity}')
+
         return alignments

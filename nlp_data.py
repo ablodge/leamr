@@ -172,12 +172,20 @@ def main():
                         continue
                 # next_tok = convert_ids[span[-1]]
                 # next_tok = [s for s,t in convert_ids.items() if t==next_tok+1]
+                # prev_tok = convert_ids[span[0]]
+                # prev_tok = [s for s, t in convert_ids.items() if t == prev_tok - 1]
                 # if next_tok:
                 #     next_tok = next_tok[0]
                 #     next_pos = stanza_pos[next_tok]
-                #     # next_name = amr.tokens[convert_ids[next_tok]]
-                #     if next_pos == 'NN':
+                #     if next_pos == 'NNP':
                 #         span.append(next_tok)
+                # if prev_tok:
+                #     prev_tok = prev_tok[0]
+                #     prev_pos = stanza_pos[prev_tok]
+                #     if prev_pos == 'NNP':
+                #         span.insert(0,prev_tok)
+                # if amr.id=='bolt12_10494_3592.5':
+                #     print()
                 if len(span) == 1:
                     stanza_entity_type.pop()
                     continue

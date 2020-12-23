@@ -11,47 +11,43 @@ from rule_based.subgraph_rules import fuzzy_align_subgraphs, postprocess_subgrap
 
 ENGLISH = True
 
-PARTIAL_CREDIT_RATE = 0.25
+PARTIAL_CREDIT_RATE = 0.1
 
 
 class Subgraph_Model(Alignment_Model):
 
-    def __init__(self, amrs, alpha=0.01, ignore_duplicates=True):
-
-        super().__init__(amrs, alpha)
-        self.subgraph_count = Counter()
-        self.ignore_duplicates = ignore_duplicates
+    def __init__(self, amrs, alpha=0.1, partial_credit_alpha=0.01, align_duplicates=True):
+        # Do not smooth over subgraphs (since the vocabulary is not finite or fixed)
+        # The model uses backoff to a partial credit model instead
+        super().__init__(amrs, alpha=alpha, smooth_translation=False)
+        self.align_duplicates = align_duplicates
 
         self.distance_model = Skellam_Distance_Model()
         self.null_model = Null_Model(self)
-        self.partial_credit_model = Partial_Credit_Subgraph_Model(self.tokens_count, self.tokens_total, alpha=alpha)
+        self.partial_credit_model = Partial_Credit_Subgraph_Model(self.tokens_count, self.tokens_total, alpha=partial_credit_alpha)
         self.partial_credit_model.update_parameters(amrs)
 
         self.is_initialized = False
+        self.num_null_aligned = 0
 
 
-    def trans_logp(self, amr, alignments, align):
+    def trans_logp(self, amr, align):
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-        align_label = self.get_alignment_label(amr, align)
-
-        postprocess_subgraph(amr, alignments, align, english=ENGLISH)
-        align = clean_subgraph(amr, alignments, align, english=ENGLISH)
-        if align is None: return float('-inf')
-
         subgraph_label = self.get_alignment_label(amr, align)
+
         token_logp = math.log(self.tokens_count[token_label]+self.alpha) - math.log(self.tokens_total)
         if not align.nodes:
             # null alignment
             trans_logp = self.null_model.logp(amr, token_label, align.tokens[0])
-            # if not self.is_initialized:
-            #     trans_logp += math.log(PARTIAL_CREDIT_RATE)
+            if not self.is_initialized:
+                trans_logp += math.log(PARTIAL_CREDIT_RATE)
             return trans_logp
-        elif (token_label, align_label) in self._trans_logp_memo:
+        elif (token_label, subgraph_label) in self._trans_logp_memo:
             # check for memoized answer
-            return self._trans_logp_memo[(token_label, align_label)]
-        elif token_label in self.translation_count:
+            return self._trans_logp_memo[(token_label, subgraph_label)]
+        elif token_label in self.translation_count and self.translation_count[token_label][subgraph_label]>0:
             # attested alignment
-            trans_logp = math.log(self.translation_count[token_label][align_label] + self.alpha) - math.log(self.translation_total)
+            trans_logp = math.log(self.translation_count[token_label][subgraph_label]) - math.log(self.translation_total)
             trans_logp -= token_logp
         elif len(token_label.split())>1 and any(t in self.translation_count and subgraph_label in self.translation_count[t]
                                                 for t in token_label.split()):
@@ -59,7 +55,8 @@ class Subgraph_Model(Alignment_Model):
             max_logp = float('-inf')
             for tok in token_label.split():
                 if tok not in self.translation_count: continue
-                logp = math.log(self.translation_count[tok][subgraph_label] + self.alpha) - math.log(self.translation_total)
+                if self.translation_count[tok][subgraph_label] == 0: continue
+                logp = math.log(self.translation_count[tok][subgraph_label]) - math.log(self.translation_total)
                 logp -= token_logp
                 if logp > max_logp:
                     max_logp = logp
@@ -68,11 +65,11 @@ class Subgraph_Model(Alignment_Model):
             # partial match by subgraph parts
             trans_logp = self.partial_credit_model.logp(amr, align, subgraph_label) + math.log(PARTIAL_CREDIT_RATE)
 
-        self._trans_logp_memo[(token_label, align_label)] = trans_logp
+        self._trans_logp_memo[(token_label, subgraph_label)] = trans_logp
 
         return trans_logp
 
-    def inductive_bias(self, amr, alignments, align):
+    def inductive_bias(self, amr, align):
 
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
         subgraph_label = self.get_alignment_label(amr, align)
@@ -84,9 +81,13 @@ class Subgraph_Model(Alignment_Model):
 
 
     def logp(self, amr, alignments, align):
-        trans_logp = self.trans_logp(amr, alignments, align)
+        postprocess_subgraph(amr, alignments, align, english=ENGLISH)
+        align = clean_subgraph(amr, alignments, align, english=ENGLISH)
+        if align is None: return float('-inf')
+
+        trans_logp = self.trans_logp(amr, align)
         dist_logp = self.distance_logp(amr, alignments, align)
-        inductive_bias = self.inductive_bias(amr, alignments, align)
+        # inductive_bias = self.inductive_bias(amr, alignments, align)
         # ln( P(subgraph|tokens)*P(tokens|subgraph)*P(distance) )
         return trans_logp + dist_logp #+ inductive_bias
 
@@ -181,12 +182,6 @@ class Subgraph_Model(Alignment_Model):
             if self.tokens_count[token_label] == 1:
                 del self.translation_count[token_label]
 
-        # subgraph counts
-        self.subgraph_count = Counter()
-        for token_label in self.translation_count:
-            for subgraph_label in self.translation_count[token_label]:
-                self.subgraph_count[subgraph_label] += self.translation_count[token_label][subgraph_label]
-
         self.translation_total += self.null_model.smoothing()
 
         distances = []
@@ -208,6 +203,14 @@ class Subgraph_Model(Alignment_Model):
 
         self.is_initialized = True
 
+        self.num_null_aligned = 0
+        for amr in amrs:
+            if amr.id not in alignments:
+                continue
+            for align in alignments[amr.id]:
+                if not align.nodes:
+                    self.num_null_aligned += 1
+
     def align(self, amr, alignments, n, unaligned=None, return_all=False):
 
         # get candidates
@@ -221,6 +224,8 @@ class Subgraph_Model(Alignment_Model):
         for n2 in candidate_neighbors[:]:
             nalign = amr.get_alignment(alignments, node_id=n2)
             if not nalign:
+                candidate_neighbors.remove(n2)
+            if nalign.type == 'dupl-subgraph':
                 candidate_neighbors.remove(n2)
 
         # handle "never => ever, -" and other similar cases
@@ -237,14 +242,49 @@ class Subgraph_Model(Alignment_Model):
                 if any(n in edge_map[p] and n2 in edge_map[p] for p in amr.nodes):
                     candidate_neighbors.append(n2)
 
+        # special rules for multi-sentence, and, or
+        if amr.nodes[n] == 'multi-sentence':
+            candidate_spans2 = [span for span in candidate_spans if len(span) == 1]
+            candidate_spans2 = [span for span in candidate_spans2 if
+                                len(amr.tokens[span[0]]) == 1 and not amr.tokens[span[0]].isalpha() and not amr.tokens[span[0]].isdigit()]
+            candidate_spans2 = [span for span in candidate_spans2 if span[-1]<len(amr.tokens)-1]
+            if candidate_spans2:
+                candidate_spans = candidate_spans2
+        if amr.nodes[n] == 'person':
+            candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span)=='person']
+        if amr.nodes[n] == 'thing':
+            candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span)=='thing']
+        if amr.nodes[n] in ['multi-sentence', 'and', 'or'] and candidate_spans:
+            candidate_neighbors = []
+        for n2 in candidate_neighbors[:]:
+            if amr.nodes[n2] in ['multi-sentence', 'and', 'or'] and candidate_spans:
+                candidate_neighbors.remove(n2)
+        if len([n2 for n2 in amr.nodes if amr.nodes[n]==amr.nodes[n2]])>1:
+            for s, r, t in amr.edges:
+                if t==n and amr.nodes[s] in ['include-91', 'same-01', 'instead-of-91', 'resemble-01', 'and', 'or']:
+                    for s2, r2, t2 in amr.edges:
+                        if s2 == s and t2 != t and amr.nodes[t2]==amr.nodes[n] and r2.endswith('1'):
+                            candidate_spans = []
+                            break
+                        elif t2 == s and amr.nodes[s2]==amr.nodes[n] and r2.endswith('1-of'):
+                            candidate_spans = []
+                            break
+
+        candidate_duplicates = []
+        for n2 in amr.nodes:
+            if n2!=n and amr.nodes[n]==amr.nodes[n2]:
+                align = amr.get_alignment(alignments, node_id=n2)
+                if align:
+                    candidate_duplicates.append(align.tokens)
+
         readable = []
         scores1 = {}
         aligns1 = {}
         for i, span in enumerate(candidate_spans):
             new_align = AMR_Alignment(type='subgraph', tokens=span, nodes=[n], amr=amr)
             replaced_align = AMR_Alignment(type='subgraph', tokens=span, nodes=[], amr=amr)
-            scores1[i] = self.logp(amr, alignments, new_align) #- self.logp(amr, alignments, replaced_align)
-            scores1[i] += self.inductive_bias(amr, alignments, new_align) - self.inductive_bias(amr, alignments, replaced_align)
+            scores1[i] = self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align)
+            scores1[i] += self.inductive_bias(amr, new_align) - self.inductive_bias(amr, replaced_align)
             aligns1[i] = new_align
             # readable.append(self.readable_logp(amr,alignments, new_align))
         scores2 = {}
@@ -252,10 +292,19 @@ class Subgraph_Model(Alignment_Model):
         for i, neighbor in enumerate(candidate_neighbors):
             replaced_align = amr.get_alignment(alignments, node_id=neighbor)
             new_align = AMR_Alignment(type=replaced_align.type, tokens=replaced_align.tokens, nodes=replaced_align.nodes+[n], amr=amr)
-            scores2[i] = self.logp(amr, alignments, new_align) #- self.logp(amr, alignments, replaced_align)
-            scores2[i] += self.inductive_bias(amr, alignments, new_align) - self.inductive_bias(amr, alignments, replaced_align)
+            scores2[i] = self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align)
+            scores2[i] += self.inductive_bias(amr, new_align) - self.inductive_bias(amr, replaced_align)
             aligns2[i] = new_align
             # readable.append(self.readable_logp(amr, alignments, new_align))
+        scores3 = {}
+        aligns3 = {}
+        if self.align_duplicates:
+            for i, span in enumerate(candidate_duplicates):
+                new_align = AMR_Alignment(type='dupl-subgraph', tokens=span, nodes=[n], amr=amr)
+                replaced_align = amr.get_alignment(alignments, token_id=span[0])
+                scores3[i] = math.log(PARTIAL_CREDIT_RATE) + self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align)
+                scores3[i] += self.inductive_bias(amr, new_align) - self.inductive_bias(amr, replaced_align)
+                aligns3[i] = new_align
 
         all_scores = {}
         all_aligns = {}
@@ -267,6 +316,10 @@ class Subgraph_Model(Alignment_Model):
             span = tuple(aligns2[x].tokens)
             all_scores[span] = scores2[x]
             all_aligns[span] = aligns2[x]
+        for x in scores3:
+            span = tuple(aligns3[x].tokens)
+            all_scores[span] = scores3[x]
+            all_aligns[span] = aligns3[x]
 
         if not all_scores:
             return None, None
@@ -281,29 +334,18 @@ class Subgraph_Model(Alignment_Model):
         # readable = [r for r in sorted(readable, key=lambda x:x['score'], reverse=True)]
         return best_align, best_score
 
-
     def get_unaligned(self, amr, alignments):
-        unaligned = set(amr.nodes)
+        aligned = set()
         for align in alignments[amr.id]:
-            for n in align.nodes:
-                if n in unaligned:
-                    unaligned.remove(n)
-        if self.ignore_duplicates:
-            duplicates = [amr.nodes[n] for n in unaligned]
-            duplicates = [[n2 for n2 in amr.nodes if amr.nodes[n2]==name] for name in duplicates]
-            duplicates = [sorted(nodes) for nodes in duplicates if len(nodes)>1]
-            for nodes in duplicates:
-                for n in nodes:
-                    if n in unaligned:
-                        unaligned.remove(n)
-        return list(unaligned)
+            aligned.update(align.nodes)
+        return [n for n in amr.nodes if n not in aligned]
 
     def readable_logp(self, amr, alignments, align):
         readable = super().readable_logp(amr, alignments, align)
         subgraph_label = self.get_alignment_label(amr, align)
 
-        trans_logp = self.trans_logp(amr, alignments, align)
-        inductive_bias = self.inductive_bias(amr, alignments, align)
+        trans_logp = self.trans_logp(amr, align)
+        inductive_bias = self.inductive_bias(amr, align)
         if not align.nodes:
             partial_inductive = {'<null>':inductive_bias}
         else:
@@ -371,10 +413,10 @@ class Partial_Credit_Subgraph_Model:
         self.edge_total = sum(self.edge_count[l] + self.alpha for l in self.edge_count)
         self.concept_translation_total = \
             sum(self.concept_translation_count[t][p] for t in self.concept_translation_count for p in self.concept_translation_count[t])
-        self.concept_translation_total += self.alpha*len(self.tokens_count)*len(self.concept_count)
+        self.concept_translation_total += self.alpha*sum(len(self.concept_translation_count[t])+1 for t in self.concept_translation_count)
         self.edge_translation_total = \
             sum(self.edge_translation_count[t][p] for t in self.edge_translation_count for p in self.edge_translation_count[t])
-        self.edge_translation_total += self.alpha * len(self.tokens_count)*len(self.edge_count)
+        self.edge_translation_total += self.alpha*sum(len(self.edge_translation_count[t])+1 for t in self.edge_translation_count)
 
     def logp(self, amr, align, align_label):
         # ln( PARTIAL_CREDIT_RATE*P(root|tokens)*P(edge_1|tokens)*P(edge_2|tokens)... )
