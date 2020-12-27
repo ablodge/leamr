@@ -1,3 +1,4 @@
+import math
 import sys
 from collections import Counter
 
@@ -120,5 +121,15 @@ class Alignment_Model:
                 unaligned = self.get_unaligned(amr, alignments)
 
             amr.alignments = alignments[amr.id]
+
+            tally = 0
+            for align in alignments[amr.id]:
+                logp = self.logp(amr, alignments, align)
+                if math.isinf(logp): continue
+                tally -= logp / math.log(2.0)
+            perplexity = math.pow(2.0, tally / len(alignments[amr.id]))
+            if perplexity>1e9:
+                print('high perplexity:',amr.id, perplexity)
+
 
         return alignments

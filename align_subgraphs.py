@@ -98,7 +98,7 @@ def main():
 
     cr = JAMR_AMR_Reader()
     amrs = cr.load(amr_file, remove_wiki=True)
-    # amrs = amrs[:10000]
+    # amrs = amrs[:1000]
     add_nlp_data(amrs, amr_file)
 
     eval_amrs = None
@@ -118,8 +118,7 @@ def main():
     alignments = None
 
     for i in range(iters):
-        print(f'Epoch {i}')
-        print('train')
+        print(f'Epoch {i}: Training data')
         alignments = align_model.align_all(amrs)
         align_model.update_parameters(amrs, alignments)
         perplexity(align_model, amrs, alignments)
@@ -130,12 +129,14 @@ def main():
         print(f'Writing subgraph alignments to: {align_file}')
         write_to_json(align_file, alignments)
         all_alignments.append(alignments)
+        print()
 
         if eval_amrs:
-            print('eval')
+            print(f'Epoch {i}: Evaluation data')
             eval_alignments = align_model.align_all(eval_amrs)
             perplexity(align_model, eval_amrs, eval_alignments)
             all_eval_alignments.append(eval_alignments)
+            print()
 
     align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.json'
     print(f'Writing subgraph alignments to: {align_file}')
