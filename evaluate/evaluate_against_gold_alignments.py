@@ -18,6 +18,7 @@ def coverage(amrs, alignments):
     return f'{100*coverage_count/total:.2f}%'
 
 
+
 def main():
     amr_file = sys.argv[1]
     align_file = sys.argv[2]
@@ -30,65 +31,46 @@ def main():
     subgraph_alignments = load_from_json(align_file, amrs)
     gold_alignments = load_from_json(gold_file, amrs)
 
-    print('coverage:',coverage(amrs, subgraph_alignments))
+    print('coverage:', coverage(amrs, subgraph_alignments))
     print('gold coverage:', coverage(amrs, gold_alignments))
 
     correct = 0
     total = 0
-    precision = 0
-    precision_total = 0
-    recall = 0
-    recall_total = 0
     span_correct = 0
     span_total = 0
     for amr in amrs:
         if amr.id not in gold_alignments:
             continue
-        gold_spans = ['B' for tok in amr.tokens]
-        for align in gold_alignments[amr.id]:
-            if len(align.tokens)>1:
-                gold_spans[align.tokens[0]] = 'B'
-                for t in align.tokens[1:]:
-                    gold_spans[t] = 'I'
-        pred_spans = ['B' for tok in amr.tokens]
-        for align in subgraph_alignments[amr.id]:
-            if len(align.tokens) > 1:
-                pred_spans[align.tokens[0]] = 'B'
-                for t in align.tokens[1:]:
-                    pred_spans[t] = 'I'
-        for t1,t2 in zip(pred_spans, gold_spans):
-            if t1==t2:
+        for tok in range(len(amr.tokens)):
+            gold_align = amr.get_alignment(gold_alignments, token_id=tok)
+            pred_align = amr.get_alignment(subgraph_alignments, token_id=tok)
+            union = set(gold_align.nodes).union(pred_align.nodes)
+            intersec = set(gold_align.nodes).intersection(pred_align.nodes)
+            # if set(pred_align.nodes)!=set(gold_align.nodes):
+            #     token1 = ' '.join(amr.tokens[t] for t in gold_align.tokens)
+            #     token2 = ' '.join(amr.tokens[t] for t in span)
+            #     nodes1 = '_'.join(amr.nodes[n] for n in pred_align.nodes)
+            #     if not nodes1:
+            #         nodes1 = '_'
+            #     nodes2 = '_'.join(amr.nodes[n] for n in gold_align.nodes)
+            #     if not nodes2:
+            #         nodes2 = '_'
+            #     print(amr.id, span, token1, token2, nodes1, '!=', nodes2)
+            #     print()
+            total+=1
+            if len(gold_align.nodes)==0 and len(pred_align.nodes)==0:
+                    correct+=1
+            else:
+                correct += len(intersec)/len(union)
+
+        for span in amr.spans:
+            gold_align = amr.get_alignment(gold_alignments, token_id=span[0])
+            if gold_align.tokens == span:
                 span_correct+=1
             span_total+=1
-        for n in amr.nodes:
-            gold_align = amr.get_alignment(gold_alignments, node_id=n)
-            pred_align = amr.get_alignment(subgraph_alignments, node_id=n)
-            if not gold_align:
-                continue
-            union = set(gold_align.tokens).union(pred_align.tokens)
-            intersec = set(gold_align.tokens).intersection(pred_align.tokens)
-            if len(union)==0:
-                continue
 
-            # correct += len(intersec)/len(union)
-            if len(intersec)>0:
-                correct+=1
-            else:
-                print(' '.join(amr.tokens[t] for t in pred_align.tokens), '!=',
-                      ' '.join(amr.tokens[t] for t in gold_align.tokens))
-                print()
-            total+=1
-            # if is_aligned1 and is_aligned2:
-            #     precision+=1
-            #     recall+=1
-            # if is_aligned1:
-            #     precision_total+=1
-            # if is_aligned2:
-            #     recall_total+=1
-    print('span accuracy:', span_correct, ' / ', span_total, ' = ', f'{100 * span_correct / span_total:.2f}%')
     print('partial accuracy:', correct, ' / ', total, ' = ', f'{100*correct/total:.2f}%')
-    # print(precision, ' / ', precision_total, ' = ', precision / precision_total)
-    # print(recall, ' / ', recall_total, ' = ', recall / recall_total)
+    print('span accuracy:', span_correct, ' / ', span_total, ' = ', f'{100 * span_correct / span_total:.2f}%')
 
 
 

@@ -3,7 +3,7 @@ import sys
 from amr_utils.alignments import load_from_json, write_to_json
 from amr_utils.amr_readers import JAMR_AMR_Reader
 
-from align_duplicates import align_duplicates
+from display import Display
 from models.subgraph_model import Subgraph_Model
 from nlp_data import add_nlp_data
 
@@ -33,21 +33,25 @@ def main():
 
     train_alignments = load_from_json(train_align_file, train_amrs)
 
-    align_model = Subgraph_Model(train_amrs, ignore_duplicates=True)
+    align_model = Subgraph_Model(train_amrs, align_duplicates=True)
     align_model.update_parameters(train_amrs, train_alignments)
 
     eval_alignments = align_model.align_all(eval_amrs)
     print('align subgraphs', coverage(eval_amrs, eval_alignments))
 
-    align_model = Subgraph_Model(train_amrs, ignore_duplicates=False)
-    align_model.update_parameters(train_amrs, train_alignments)
-
-    subgraph_alignments, duplicate_alignments = align_duplicates(eval_amrs, align_model, eval_alignments)
+    subgraph_alignments = {}
+    duplicate_alignments = {}
+    for amr_id in eval_alignments:
+        subgraph_alignments[amr_id] = [align for align in eval_alignments[amr_id] if align.type=='subgraph']
+        duplicate_alignments[amr_id] = [align for align in eval_alignments[amr_id] if align.type == 'dupl-subgraph']
 
     # write output
     align_file = eval_amr_file.replace('.txt', '') + f'.subgraph_alignments.json'
     print(f'Writing subgraph alignments to: {align_file}')
     write_to_json(align_file, subgraph_alignments)
+    for amr in eval_amrs:
+        amr.alignments = subgraph_alignments[amr.id]
+    Display.style(eval_amrs, eval_amr_file.replace('.txt', '') + f'.subgraphs.html')
 
     align_file = eval_amr_file.replace('.txt', '') + f'.duplicate_alignments.json'
     print(f'Writing duplicate alignments to: {align_file}')
