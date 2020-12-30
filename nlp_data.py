@@ -103,8 +103,6 @@ def main():
     lemmas_json = {}
     ner_spans = {}
     mwe_spans = {}
-    multi_word_tokens = {}
-    multi_word_lemmas = {}
     multi_word_spans = {}
     coreferences = {}
 
@@ -119,6 +117,9 @@ def main():
     enum_amrs = [_ for _ in enumerate(amrs)]
     for amr_idx, amr in tqdm(enum_amrs):
         tokens = amr.tokens
+        for i,tok in enumerate(tokens):
+            if tok.startswith('@') and tok.endswith('@') and len(tok)==3:
+                tokens[i] = tok[1]
         doc = nlp(' '.join(tokens))
         start_idx = {}
         end_idx = {}
@@ -241,29 +242,21 @@ def main():
                         break
             taken.append(i)
 
-        multi_word_tokens[amr.id] = []
-        multi_word_lemmas[amr.id] = []
         multi_word_spans[amr.id] = []
         taken = set()
         for i, tok in enumerate(amr.tokens):
             if i in taken: continue
-            if any(span[0]<=i<span[1] for span in ner_spans[amr.id]):
+            if any(i==span[0] for span in ner_spans[amr.id]):
                 span = [s for s in ner_spans[amr.id] if s[0]<=i<s[1]][0]
                 span = [i for i in range(span[0],span[1])]
-                multi_word_tokens[amr.id].append('_'.join(amr.tokens[t] for t in span))
-                multi_word_lemmas[amr.id].append('_'.join(lemmas[t] for t in span))
                 multi_word_spans[amr.id].append(span)
                 taken.update(span)
-            elif any(span[0]<=i<span[1] for span in mwe_spans[amr.id]):
+            elif any(i==span[0] for span in mwe_spans[amr.id]):
                 span = [s for s in mwe_spans[amr.id] if s[0]<=i<s[1]][0]
                 span = [i for i in range(span[0], span[1])]
-                multi_word_tokens[amr.id].append('_'.join(amr.tokens[t] for t in span))
-                multi_word_lemmas[amr.id].append('_'.join(lemmas[t] for t in span))
                 multi_word_spans[amr.id].append(span)
                 taken.update(span)
             else:
-                multi_word_tokens[amr.id].append(tok)
-                multi_word_lemmas[amr.id].append(lemmas[i])
                 multi_word_spans[amr.id].append([i])
                 taken.add(i)
         if coref_parser is not None:

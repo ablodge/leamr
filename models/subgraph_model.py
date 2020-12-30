@@ -7,7 +7,7 @@ from amr_utils.alignments import AMR_Alignment
 from models.base_model import Alignment_Model
 from models.distance_model import Gaussian_Distance_Model, Skellam_Distance_Model
 from models.null_model import Null_Model
-from rule_based.subgraph_rules import fuzzy_align_subgraphs, postprocess_subgraph, clean_subgraph
+from rule_based.subgraph_rules import fuzzy_align_subgraphs, postprocess_subgraph, clean_subgraph, clean_alignments
 
 ENGLISH = True
 
@@ -78,9 +78,10 @@ class Subgraph_Model(Alignment_Model):
         return inductive_bias
 
 
-    def logp(self, amr, alignments, align):
-        postprocess_subgraph(amr, alignments, align, english=ENGLISH)
-        align = clean_subgraph(amr, alignments, align)
+    def logp(self, amr, alignments, align, postprocess=True):
+        if postprocess:
+            postprocess_subgraph(amr, alignments, align, english=ENGLISH)
+            align = clean_subgraph(amr, alignments, align)
         if align is None: return float('-inf')
 
         trans_logp = self.trans_logp(amr, align)
@@ -229,14 +230,12 @@ class Subgraph_Model(Alignment_Model):
             unaligned = self.get_unaligned(amr, alignments)
         candidate_spans = [align.tokens for align in alignments[amr.id] if not align.nodes]
         tmp_align = AMR_Alignment(type='subgraph', tokens=[0], nodes=[n])
-        postprocess_subgraph(amr, alignments, tmp_align)
+        postprocess_subgraph(amr, alignments, tmp_align, english=ENGLISH)
         candidate_neighbors = [s for s, r, t in amr.edges if t in tmp_align.nodes and s not in unaligned] + \
                               [t for s, r, t in amr.edges if s in tmp_align.nodes and t not in unaligned]
         for n2 in candidate_neighbors[:]:
             nalign = amr.get_alignment(alignments, node_id=n2)
-            if not nalign:
-                candidate_neighbors.remove(n2)
-            if nalign.type == 'dupl-subgraph':
+            if not nalign or nalign.type == 'dupl-subgraph':
                 candidate_neighbors.remove(n2)
 
         # handle "never => ever, -" and other similar cases
@@ -261,10 +260,6 @@ class Subgraph_Model(Alignment_Model):
             candidate_spans2 = [span for span in candidate_spans2 if span[-1]<len(amr.tokens)-1]
             if candidate_spans2:
                 candidate_spans = candidate_spans2
-        if amr.nodes[n] == 'person':
-            candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span) in ['person','people','those']]
-        if amr.nodes[n] == 'thing':
-            candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span) in ['thing','how']]
         if amr.nodes[n] in ['multi-sentence', 'and', 'or'] and candidate_spans:
             candidate_neighbors = []
         for n2 in candidate_neighbors[:]:
@@ -272,7 +267,7 @@ class Subgraph_Model(Alignment_Model):
                 candidate_neighbors.remove(n2)
         if len([n2 for n2 in amr.nodes if amr.nodes[n]==amr.nodes[n2]])>1:
             for s, r, t in amr.edges:
-                if t==n and amr.nodes[s] in ['include-91', 'same-01', 'instead-of-91', 'resemble-01', 'and', 'or']:
+                if t==n and amr.nodes[s] in ['include-91', 'same-01', 'instead-of-91', 'resemble-01', 'differ-02', 'and', 'or']:
                     for s2, r2, t2 in amr.edges:
                         if s2 == s and t2 != t and amr.nodes[t2]==amr.nodes[n] and r2.endswith('1'):
                             candidate_spans = []
@@ -280,9 +275,15 @@ class Subgraph_Model(Alignment_Model):
                         elif t2 == s and amr.nodes[s2]==amr.nodes[n] and r2.endswith('1-of'):
                             candidate_spans = []
                             break
+        if ENGLISH:
+            if amr.nodes[n] == 'person':
+                candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span) in ['person','people','those']]
+            if amr.nodes[n] == 'thing':
+                candidate_spans = [span for span in candidate_spans if ' '.join(amr.lemmas[t] for t in span) in ['thing','how']]
 
         candidate_duplicates = []
         for n2 in amr.nodes:
+            if amr.nodes[n].isdigit() or '"' in amr.nodes[n]: break
             if n2!=n and amr.nodes[n]==amr.nodes[n2]:
                 align = amr.get_alignment(alignments, node_id=n2)
                 if align:
@@ -302,8 +303,9 @@ class Subgraph_Model(Alignment_Model):
         aligns2 = {}
         for i, neighbor in enumerate(candidate_neighbors):
             replaced_align = amr.get_alignment(alignments, node_id=neighbor)
+            if replaced_align.type.startswith('dupl'): continue
             new_align = AMR_Alignment(type=replaced_align.type, tokens=replaced_align.tokens, nodes=replaced_align.nodes+[n], amr=amr)
-            scores2[i] = self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align)
+            scores2[i] = self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align, postprocess=False)
             scores2[i] += self.inductive_bias(amr, new_align) - self.inductive_bias(amr, replaced_align)
             aligns2[i] = new_align
             # readable.append(self.readable_logp(amr, alignments, new_align))
@@ -313,7 +315,7 @@ class Subgraph_Model(Alignment_Model):
             for i, span in enumerate(candidate_duplicates):
                 new_align = AMR_Alignment(type='dupl-subgraph', tokens=span, nodes=[n], amr=amr)
                 replaced_align = amr.get_alignment(alignments, token_id=span[0])
-                scores3[i] = math.log(PARTIAL_CREDIT_RATE) + self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align)
+                scores3[i] = math.log(PARTIAL_CREDIT_RATE) + self.logp(amr, alignments, new_align) - self.logp(amr, alignments, replaced_align, postprocess=False)
                 scores3[i] += self.inductive_bias(amr, new_align) - self.inductive_bias(amr, replaced_align)
                 aligns3[i] = new_align
 
@@ -344,6 +346,9 @@ class Subgraph_Model(Alignment_Model):
 
         # readable = [r for r in sorted(readable, key=lambda x:x['score'], reverse=True)]
         return best_align, best_score
+
+    def postprocess_alignments(self, amr, alignments):
+        clean_alignments(amr, alignments)
 
     def get_unaligned(self, amr, alignments):
         aligned = set()

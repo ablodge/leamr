@@ -70,7 +70,10 @@ class Alignment_Model:
     def get_unaligned(self, amr, alignments):
         return []
 
-    def align_all(self, amrs, alignments=None, preprocess=True):
+    def postprocess_alignments(self, amr, alignments):
+        pass
+
+    def align_all(self, amrs, alignments=None, preprocess=True, debug=False):
         if alignments is None:
             alignments = self.get_initial_alignments(amrs, preprocess)
 
@@ -96,15 +99,16 @@ class Alignment_Model:
                 span = list(span)
                 new_align = candidate_aligns[best]
 
-                # old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
-                # readable = [(all_scores[(n,span)],
-                #             self.get_alignment_label(amr, candidate_aligns[(n,span)]),
-                #              ' '.join(amr.lemmas[t] for t in span),
-                #              self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-                #              self.readable_logp(amr, alignments, old_alignments[span]),
-                #              ) for n,span in all_scores.keys()]
-                # readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
-                # x = 0
+                if debug:
+                    old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
+                    readable = [(all_scores[(n,span)],
+                                self.get_alignment_label(amr, candidate_aligns[(n,span)]),
+                                 ' '.join(amr.lemmas[t] for t in span),
+                                 self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
+                                 self.readable_logp(amr, alignments, old_alignments[span]),
+                                 ) for n,span in all_scores.keys()]
+                    readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
+                    print(end='')
 
                 # add node to alignment
                 found = False
@@ -121,6 +125,7 @@ class Alignment_Model:
                 unaligned = self.get_unaligned(amr, alignments)
 
             amr.alignments = alignments[amr.id]
+            self.postprocess_alignments(amr, alignments)
 
             tally = 0
             for align in alignments[amr.id]:
@@ -128,8 +133,8 @@ class Alignment_Model:
                 if math.isinf(logp): continue
                 tally -= logp / math.log(2.0)
             perplexity = math.pow(2.0, tally / len(alignments[amr.id]))
-            if perplexity>1e9:
-                print('high perplexity:',amr.id, perplexity)
+            if perplexity>1e6 and len(amr.spans)>1:
+                print('\rhigh perplexity:',amr.id, perplexity)
 
 
         return alignments
