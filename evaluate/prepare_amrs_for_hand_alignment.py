@@ -1,18 +1,21 @@
 import sys
 import random
 
+from amr_utils.alignments import load_from_json
 from amr_utils.amr_readers import LDC_AMR_Reader, JAMR_AMR_Reader
 from amr_utils.style import HTML_AMR
 
+from display import Display
 
-class Display:
+
+class ID_Display:
 
     @staticmethod
     def style(amrs, outfile):
         output = HTML_AMR.style(amrs[:5000],
-                                assign_node_desc=Display.node_desc,
-                                assign_token_desc=Display.token_desc,
-                                assign_edge_desc=Display.edge_desc)
+                                assign_node_desc=ID_Display.node_desc,
+                                assign_token_desc=ID_Display.token_desc,
+                                assign_edge_desc=ID_Display.edge_desc,)
 
         with open(outfile, 'w+', encoding='utf8') as f:
             f.write(output)
@@ -20,7 +23,7 @@ class Display:
     @staticmethod
     def node_desc(amr, n):
         node_labels = get_node_labels(amr)
-        return node_labels[n]
+        return node_labels[n] + ' : ' + Display.node_desc(amr, n)
 
     @staticmethod
     def edge_desc(amr, e):
@@ -29,7 +32,9 @@ class Display:
 
     @staticmethod
     def token_desc(amr, tok):
-        return str(tok)
+        desc1 = str(tok)
+        desc2 = Display.token_desc(amr, tok)
+        return f'{desc1} : {desc2}'
 
 def get_node_labels(amr):
     node_labels = {}
@@ -51,9 +56,8 @@ def get_edge_labels(amr):
     node_labels = get_node_labels(amr)
     return {(s,r,t):f'{node_labels[s]}.{node_labels[t]}' for s,r,t in amr.edges}
 
-def main():
-    amr_file = sys.argv[1]
-    output_file = sys.argv[3]
+
+def load_szubert_data(amr_file):
 
     # Szubert data
     cr = LDC_AMR_Reader()
@@ -85,20 +89,41 @@ def main():
     print('Missing:', ' '.join(i for i in other_ids))
     print(len(amrs), '/', len(amrs1), 'AMRs printed')
 
-    random.shuffle(amrs)
-    amrs = amrs[:20]
-    print('Sampling AMRs:')
+    return amrs
+
+
+
+
+def main():
+    amr_file = sys.argv[1]
+    alignment_file = sys.argv[2]
+    relation_alignment_file = sys.argv[3]
+
+    cr = JAMR_AMR_Reader()
+    amrs = cr.load(amr_file, remove_wiki=True)
+
+    subgraph_alignments = load_from_json(alignment_file, amrs)
+    relation_alignments = load_from_json(relation_alignment_file, amrs)
+
+    amrs = [amr for amr in amrs if amr.id in subgraph_alignments]
     for amr in amrs:
-        print(amr.id)
+        amr.alignments = subgraph_alignments[amr.id]
+    # random.shuffle(amrs)
+    # amrs = amrs[:100]
+    # print('Sampling AMRs:')
+    # for amr in amrs:
+    #     print(amr.id)
 
-
-
-
-    output_file = output_file.replace('.txt','.html')
-    Display.style(amrs, output_file)
-
-    output_file = output_file.replace('.html','.hand_alignments.tsv')
+    output_file = amr_file.replace('.txt','.gold.txt')
     with open(output_file, 'w+', encoding='utf8') as f:
+        for amr in amrs:
+            f.write(amr.jamr_string())
+
+    output_file2 = output_file.replace('.txt','.html')
+    ID_Display.style(amrs, output_file2)
+
+    output_file3 = output_file.replace('.gold.txt','.gold_alignments.tsv')
+    with open(output_file3, 'w+', encoding='utf8') as f:
         for amr in amrs:
             f.write('\t'.join(['amr',str(amr.id)])+'\n')
             reentrancies = []
@@ -110,9 +135,21 @@ def main():
             edge_labels = get_edge_labels(amr)
             f.write('\t'.join(['tokens']+[f'{i}={token}' for i,token in enumerate(amr.tokens)])+'\n')
             for n in amr.nodes:
-                f.write('\t'.join(['node',node_labels[n], amr.nodes[n]])+'\n')
+                nalign = amr.get_alignment(subgraph_alignments, node_id=n)
+                if nalign:
+                    token_ids = nalign.tokens
+                    token_ids = ','.join(str(t) for t in token_ids)
+                    f.write('\t'.join(['node',node_labels[n], amr.nodes[n], token_ids])+'\n')
+                else:
+                    f.write('\t'.join(['node', node_labels[n], amr.nodes[n], '']) + '\n')
             for s,r,t in amr.edges:
-                f.write('\t'.join(['edge', edge_labels[(s,r,t)], f'{amr.nodes[s]} {r} {amr.nodes[t]}']) + '\n')
+                ealign = amr.get_alignment(relation_alignments, edge=(s,r,t))
+                if ealign:
+                    token_ids = ealign.tokens
+                    token_ids = ','.join(str(t) for t in token_ids)
+                    f.write('\t'.join(['edge', edge_labels[(s,r,t)], f'{amr.nodes[s]} {r} {amr.nodes[t]}', token_ids])+'\n')
+                else:
+                    f.write('\t'.join(['edge', edge_labels[(s,r,t)], f'{amr.nodes[s]} {r} {amr.nodes[t]}', '']) + '\n')
             for s,r,t in reentrancies:
                 f.write('\t'.join(['reentrancy', edge_labels[(s,r,t)], f'{amr.nodes[s]} {r} {amr.nodes[t]}']) + '\n')
 
