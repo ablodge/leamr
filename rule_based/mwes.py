@@ -4,7 +4,15 @@ HAND_ADDED_MWES = [
 'and / or',
 'how many',
 'how much',
-'such that'
+'such that',
+'thank you',
+'die of',
+'sick of',
+'as well as',
+'last night',
+'get rid of',
+'secretary of state',
+'prime minister'
 ]
 # prepositional multiword expressions taken from STREUSLE
 PMWES = [
@@ -155,7 +163,7 @@ PMWES = [
 # verbal multiword expressions taken from STREUSLE
 VMWES = [
 'deal with',
-'be to',
+# 'be to',
 'take care of',
 'take the time',
 'pick up',
@@ -1680,7 +1688,7 @@ OTHER_MWES = [
 'zero in',
 'door to door',
 'stiff arm',
-'would be',
+# 'would be',
 'television network',
 'farm out',
 'head on',

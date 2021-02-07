@@ -4,17 +4,18 @@ from amr_utils.alignments import write_to_json, load_from_json
 from amr_utils.amr_readers import JAMR_AMR_Reader
 
 from display import Display
-from evaluate.utils import perplexity, evaluate, evaluate_relations
+from evaluate.utils import perplexity, evaluate, evaluate_relations, evaluate_reentrancies
+from models.reentrancy_model import Reentrancy_Model
 from models.relation_model import Relation_Model
 from nlp_data import add_nlp_data
 
 
 def report_progress(amrs, amr_file, alignments, epoch=None):
     epoch = '' if epoch is None else f'.epoch{epoch}'
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.relation_alignments{epoch}.html')
+    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.reentrancy_alignments{epoch}.html')
 
-    align_file = amr_file.replace('.txt', '') + f'.relation_alignments{epoch}.json'
-    print(f'Writing relation alignments to: {align_file}')
+    align_file = amr_file.replace('.txt', '') + f'.reentrancy_alignments{epoch}.json'
+    print(f'Writing reentrancy alignments to: {align_file}')
     write_to_json(align_file, alignments)
 
 
@@ -42,26 +43,35 @@ def main():
 
     align_file = amr_file.replace('.txt', '') + '.subgraph_alignments.json'
     subgraph_alignments = load_from_json(align_file, amrs)
+    align_file = amr_file.replace('.txt', '') + '.relation_alignments.json'
+    relation_alignments = load_from_json(align_file, amrs)
 
     if gold_eval_alignments is not None:
         align_file = eval_amr_file.replace('.txt', '') + '.subgraph_alignments.gold.json'
         gold_subgraph_alignments = load_from_json(align_file, eval_amrs)
         align_file = eval_amr_file.replace('.txt', '') + '.subgraph_alignments.json'
         pred_subgraph_alignments = load_from_json(align_file, eval_amrs)
-        # pred_subgraph_alignments = gold_subgraph_alignments
+        align_file = eval_amr_file.replace('.txt', '') + '.relation_alignments.gold.json'
+        gold_relation_alignments = load_from_json(align_file, eval_amrs)
+        align_file = eval_amr_file.replace('.txt', '') + '.relation_alignments.json'
+        pred_relation_alignments = load_from_json(align_file, eval_amrs)
+        # use gold subgraphs and relations
+        pred_subgraph_alignments = gold_subgraph_alignments
+        pred_relation_alignments = gold_relation_alignments
         for amr_id in pred_subgraph_alignments:
             subgraph_alignments[amr_id] = pred_subgraph_alignments[amr_id]
+        for amr_id in pred_relation_alignments:
+            relation_alignments[amr_id] = pred_relation_alignments[amr_id]
         for amr in eval_amrs:
             spans = [align.tokens for align in pred_subgraph_alignments[amr.id] if align.type=='subgraph']
             amr.spans = spans
 
-    align_model = Relation_Model(amrs, subgraph_alignments)
+    align_model = Reentrancy_Model(amrs, subgraph_alignments, relation_alignments)
 
     iters = 3
 
     alignments = None
     eval_alignments = None
-
     for i in range(iters):
         print(f'Epoch {i}: Training data')
         alignments = align_model.align_all(amrs)
@@ -75,12 +85,11 @@ def main():
             eval_alignments = align_model.align_all(eval_amrs)
             perplexity(align_model, eval_amrs, eval_alignments)
             if gold_eval_alignments is not None:
-                evaluate_relations(eval_amrs, eval_alignments, gold_eval_alignments, pred_subgraph_alignments, gold_subgraph_alignments)
-                # evaluate(eval_amrs, eval_alignments, gold_eval_alignments, mode='edges')
+                # evaluate_relations(eval_amrs, eval_alignments, gold_eval_alignments, pred_subgraph_alignments, gold_subgraph_alignments)
+                evaluate_reentrancies(eval_amrs, eval_alignments, gold_eval_alignments)
             print()
 
     report_progress(amrs, amr_file, alignments)
-
     if eval_amrs:
         report_progress(eval_amrs, eval_amr_file, eval_alignments)
 

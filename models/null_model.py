@@ -31,13 +31,15 @@ class Null_Model:
             for start, end in zip(start_parens, end_parens):
                 if start <= token_idx <= end:
                     return math.log(0.5)
-        # # repetition
-        # for span in amr.spans:
-        #     if span[0]!=token_idx and ' '.join(amr.lemmas[t] for t in span)==token_label and rank>=4:
-        #         return math.log(0.5)
         p = 1 / (rank)
         logp = 0.5 * math.log(p)
         logp = max(logp, math.log(0.01))
+
+        # repetition
+        for span in amr.spans:
+            if span[0] < token_idx and ' '.join(amr.lemmas[t] for t in span) == token_label:
+                if math.log(0.1)>logp:
+                    return math.log(0.1)
         return logp
 
     def smoothing(self):

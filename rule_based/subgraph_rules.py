@@ -24,20 +24,18 @@ def postprocess_subgraph(amr, alignments, align, english=False):
                 align.nodes.append(s)
             elif amr.nodes[s].endswith('-entity') and r == ':value' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
-            elif amr.nodes[s] == 'have-degree-91' and r == ':ARG3' and not amr.get_alignment(alignments, node_id=s):
+            elif amr.nodes[s] in ['have-degree-91', 'have-quant-91'] and r == ':ARG3' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
-            elif amr.nodes[s] == 'have-rel-role-91' and r == ':ARG2' and not amr.get_alignment(alignments, node_id=s):
+            elif amr.nodes[s] in ['have-rel-role-91', 'have-org-role-91'] and r in [':ARG2',':ARG3'] and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
-            elif amr.nodes[s] == 'have-org-role-91' and r == ':ARG2' and not amr.get_alignment(alignments, node_id=s):
+            elif amr.nodes[s] == 'relative-position' and r == ':direction' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
         elif s in align.nodes and t not in align.nodes:
             if r == ':name' and not amr.get_alignment(alignments, node_id=t):
                 align.nodes.append(t)
-            elif amr.nodes[t] == 'have-degree-91' and r == ':ARG3-of' and not amr.get_alignment(alignments, node_id=t):
+            elif amr.nodes[t] in ['have-degree-91', 'have-quant-91'] and r == ':ARG3-of' and not amr.get_alignment(alignments, node_id=t):
                 align.nodes.append(t)
-            elif amr.nodes[t] == 'have-rel-role-91' and r == ':ARG2-of' and not amr.get_alignment(alignments, node_id=t):
-                align.nodes.append(t)
-            elif amr.nodes[t] == 'have-org-role-91' and r == ':ARG2-of' and not amr.get_alignment(alignments, node_id=t):
+            elif amr.nodes[t] in ['have-rel-role-91', 'have-org-role-91'] and r in [':ARG2-of',':ARG3-of'] and not amr.get_alignment(alignments, node_id=t):
                 align.nodes.append(t)
     # Second pass
     for s, r, t in amr.edges:
@@ -52,8 +50,9 @@ def postprocess_subgraph(amr, alignments, align, english=False):
                 if talign:
                     talign.nodes.remove(t)
                 align.nodes.append(t)
-            elif amr.nodes[s] == 'date-entity' and r != ':mod' and not r.endswith('-of') and not amr.get_alignment(
-                    alignments, node_id=t):
+            elif amr.nodes[s] == 'date-entity' and r != ':mod' and not r.endswith('-of') and not amr.get_alignment(alignments, node_id=t):
+                align.nodes.append(t)
+            elif amr.nodes[s].endswith('-quantity') and r == ':unit' and not amr.get_alignment(alignments, node_id=t):
                 align.nodes.append(t)
     # Third pass
     for s, r, t in amr.edges:
@@ -104,6 +103,8 @@ def _postprocess_subgraph_english(amr, alignments, align):
                 next_tok = align.tokens[-1] + 1
                 if next_tok < len(amr.lemmas) and amr.lemmas[next_tok].lower() in ['have', 'be']:
                     align.nodes.append(s)
+            elif amr.nodes[s] in ['after','before'] and r == ':op1'  and amr.nodes[t]=='now' and not amr.get_alignment(alignments, node_id=s):
+                align.nodes.append(s)
         elif s in align.nodes and t not in align.nodes:
             # imperative
             if amr.nodes[t] == 'imperative' and r == ':mode' and not amr.get_alignment(alignments, node_id=t):
@@ -118,6 +119,8 @@ def _postprocess_subgraph_english(amr, alignments, align):
                 if any(amr.lemmas[tok].lower().endswith('able') or amr.lemmas[tok].lower().endswith('ible') for tok in
                        align.tokens):
                     align.nodes.append(t)
+            elif amr.nodes[s] in ['after','before'] and r == ':op1'  and amr.nodes[t]=='now' and not amr.get_alignment(alignments, node_id=t):
+                align.nodes.append(t)
     # second pass
     for s, r, t in amr.edges:
         if t in align.nodes and s not in align.nodes:
@@ -133,18 +136,38 @@ def _postprocess_subgraph_english(amr, alignments, align):
                     align.nodes.append(t)
 
 
-def get_token_label(amr, tokens):
+def normalize_token_label(amr, tokens):
     tokens = [amr.tokens[t] for t in tokens]
     token_label = ' '.join([tok for tok in tokens if tok!='"'])
     if token_label.startswith('<a_href'):
         token_label = token_label.replace('<a_href="', '').replace('">', '')
+    if token_label == 'British':
+        token_label = 'Britain'
+    elif token_label == 'French':
+        return 'France'
+    elif token_label == 'Italian':
+        return 'Italy'
+    elif token_label == 'Chinese':
+        return 'China'
+    elif token_label == 'Japanese':
+        return 'Japan'
+    elif token_label == 'Canadian':
+        return 'Canada'
+    elif token_label == 'German':
+        return 'Germany'
+    elif token_label in ['Korean', 'Russian', 'Australian', 'Austrian']:
+        return token_label[:-1]
+    elif token_label in ['Israeli', 'Iraqi', 'Irani',]:
+        return token_label[:-1]
     return token_label
 
 
-def get_lemma_label(amr, tokens):
+def normalize_lemma_label(amr, tokens):
     token_label = '-'.join(amr.lemmas[t] for t in tokens)
     if token_label.startswith('<a_href'):
         token_label = token_label.replace('<a_href="', '').replace('">', '')
+    if token_label == 'daily':
+        return 'day'
     return token_label
 
 
@@ -159,7 +182,7 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
             parts = [t for r, t in sorted(parts, key=lambda x: x[0])]
             label = ' '.join(amr.nodes[t].replace('"', '') for t in parts)
             candidate_spans = [span for span in amr.spans if not amr.get_alignment(alignments, token_id=span[0])]
-            candidate_spans = [span for span in candidate_spans if get_token_label(amr, span).lower() == label.lower()]
+            candidate_spans = [span for span in candidate_spans if normalize_token_label(amr, span).lower() == label.lower()]
             if candidate_spans:
                 span = candidate_spans[0]
                 align = amr.get_alignment(alignments, token_id=span[0])
@@ -179,7 +202,7 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
                     candidate_spans = [span for span in amr.spans if
                                        not amr.get_alignment(alignments, token_id=span[0])]
                     candidate_spans = [span for span in candidate_spans if
-                                       len(span) == 1 and get_token_label(amr, span) == acronym]
+                                       len(span) == 1 and normalize_token_label(amr, span) == acronym]
                     if candidate_spans:
                         span = candidate_spans[0]
                         align = amr.get_alignment(alignments, token_id=span[0])
@@ -192,7 +215,7 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
                     span = [t for t in range(start, start + len(parts))]
                     if span[-1] >= len(amr.tokens): continue
                     if amr.get_alignment(alignments, token_id=span[0]): continue
-                    if get_token_label(amr, span) == label:
+                    if normalize_token_label(amr, span) == label:
                         tok = span[0]
                         if any(len(amr.tokens[t]) >= 4 for t in span):
                             while len(amr.tokens[tok]) <= 3:
@@ -244,10 +267,10 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
             # fuzzy prefix match
             for prefix_size in prefix_sizes:
                 candidate_spans = [span for span in amr.spans
-                                    if get_lemma_label(amr, span)[:prefix_size].lower() == label[:prefix_size].lower()]
+                                    if normalize_lemma_label(amr, span)[:prefix_size].lower() == label[:prefix_size].lower()]
                 if not is_name(n):
                     candidate_spans += [span for span in amr.spans
-                                    if get_lemma_label(amr, span)[:prefix_size].lower() == label.split('-')[0][:prefix_size].lower()
+                                    if normalize_lemma_label(amr, span)[:prefix_size].lower() == label.split('-')[0][:prefix_size].lower()
                                     and span not in candidate_spans]
                 candidate_spans = [span for span in candidate_spans if not amr.get_alignment(alignments, token_id=span[0])]
                 if len(candidate_spans) != 1:
@@ -285,7 +308,7 @@ def fuzzy_align_subgraphs(amr, alignments, english=False):
                     continue
                 if len(name_parts)>3:
                     continue
-            candidate_spans = [span for span in amr.spans if any(amr.lemmas[t] == node_label(amr, n) for t in span)]
+            candidate_spans = [span for span in amr.spans if any(amr.lemmas[t].lower() == node_label(amr, n).lower() for t in span)]
             candidate_spans = [span for span in candidate_spans if not any(node_label(amr, n2) == node_label(amr, n)
                                                                             for n2 in amr.get_alignment(alignments, token_id=span[0]).nodes)]
             candidate_nodes = [n2 for n2 in amr.nodes if node_label(amr, n) == node_label(amr, n2) and not amr.get_alignment(alignments, node_id=n2)]
@@ -413,6 +436,23 @@ def _exact_align_subgraphs_english(amr, alignments):
 
     # exact match special rules
     for n in amr.nodes:
+        if amr.nodes[n] in ['i', 'we', 'you','it']:
+            candidate_strings = {'i': ['i', 'my', 'mine', 'me'],
+                                 'we': ['we', 'our', 'ours', 'us'],
+                                 'you': ['you', 'your', 'yours'],
+                                 'it': ['it', 'its', "it's"]}
+            candidate_nodes = [n2 for n2 in amr.nodes if amr.nodes[n] == amr.nodes[n2]]
+            if len(candidate_nodes) > 1 and n != candidate_nodes[0]: continue
+            candidate_spans = [span for span in amr.spans if
+                               len(span) == 1 and amr.lemmas[span[0]].lower() in candidate_strings[amr.nodes[n]]]
+            if candidate_spans:
+                for span in candidate_spans:
+                    span_align = amr.get_alignment(alignments, token_id=span[0])
+                    if span_align:
+                        span_align.nodes = []
+                span_align = amr.get_alignment(alignments, token_id=candidate_spans[0][0])
+                span_align.nodes.append(n)
+            continue
         align = amr.get_alignment(alignments, node_id=n)
         if not align:
             candidate_spans = []
@@ -423,7 +463,7 @@ def _exact_align_subgraphs_english(amr, alignments):
                 if label == 'and':
                     candidate_spans = [span for span in candidate_spans if
                                         ' '.join(amr.lemmas[t] for t in span).lower() in ['and', '&', 'additionally',
-                                                                                          'as well', 'in addition']]
+                                                                                          'as well', 'as well as', 'in addition']]
                     if not candidate_spans:
                         candidate_spans = [span for span in candidate_spans if
                                             ' '.join(amr.lemmas[t] for t in span).lower() in [',', ';']]
@@ -448,7 +488,12 @@ def _exact_align_subgraphs_english(amr, alignments):
             # exact match for 'include-91'
             elif amr.nodes[n] == 'include-91':
                 candidate_spans = [span for span in amr.spans if
-                                    ' '.join(amr.lemmas[t] for t in span).lower() in ['of', 'out of']]
+                                    ' '.join(amr.lemmas[t] for t in span).lower() in ['include', 'out of']]
+                candidate_spans = [s for s in candidate_spans if not amr.get_alignment(alignments, token_id=s[0])]
+            # exact match for 'instead-of-91'
+            elif amr.nodes[n] == 'instead-of-91':
+                candidate_spans = [span for span in amr.spans if
+                                   ' '.join(amr.lemmas[t] for t in span).lower() in ['instead', 'instead of']]
                 candidate_spans = [s for s in candidate_spans if not amr.get_alignment(alignments, token_id=s[0])]
             # exact match for 'cause-01'
             elif amr.nodes[n] == 'cause-01':
@@ -547,8 +592,8 @@ def _exact_align_subgraphs_english(amr, alignments):
                     align = amr.get_alignment(alignments, token_id=span[0])
                     align.nodes.append(candidate_nodes[0])
             # try un- non-
-            elif len(span) == 1 and any(label.startswith(neg) for neg in ['un', 'non', 'in']):
-                prefix = 'un' if label.startswith('un') else 'in' if label.startswith('in') else 'non'
+            elif len(span) == 1 and any(label.startswith(neg) for neg in ['un', 'non', 'in', 'im','il']):
+                prefix = [pre for pre in ['un', 'non', 'in', 'im','il'] if label.startswith(pre)][0]
                 candidate_spans = [span for span in amr.spans if
                                     len(span) == 1 and amr.lemmas[span[0]][:6] == label[:6]]
                 candidate_spans = [span for span in candidate_spans if
@@ -568,14 +613,19 @@ def _exact_align_subgraphs_english(amr, alignments):
                     align.nodes.append(candidate_nodes[0])
                     align.nodes.append(minus)
             # WSJ Date format
-            elif len(span) == 1 and label.isdigit() and len(label) == 6:
-                year = int(label[:2])
-                if year < 20:
-                    year = 2000 + year
+            elif len(span) == 1 and label.isdigit() and (len(label) == 6 or (len(label)==8 and label[:2]=='20')):
+                if len(label) == 8 and label[:2]=='20':
+                    year = label[:4]
+                    month = int(label[4:6])
+                    day = int(label[6:])
                 else:
-                    year = 1900 + year
-                month = int(label[2:4])
-                day = int(label[4:])
+                    year = int(label[:2])
+                    if year < 20:
+                        year = 2000 + year
+                    else:
+                        year = 1900 + year
+                    month = int(label[2:4])
+                    day = int(label[4:])
                 for n in amr.nodes:
                     if amr.nodes[n] == 'date-entity':
                         if amr.get_alignment(alignments, node_id=n):
@@ -595,6 +645,54 @@ def _exact_align_subgraphs_english(amr, alignments):
                                     break
 
 
+def english_is_alignment_forbidden(amr, span, n):
+
+    token_label = ' '.join(amr.lemmas[t] for t in span)
+    if amr.nodes[n] == 'person':
+        if token_label not in ['person', 'people', 'those']:
+            return True
+    elif amr.nodes[n] == 'thing':
+        if token_label not in ['thing', 'how']:
+            return True
+    elif amr.nodes[n] == 'multi-sentence':
+        if len(span)!=1: return True
+        if len(amr.tokens[span[0]]) != 1:
+            return True
+        if amr.tokens[span[0]].isalpha() or amr.tokens[span[0]].isdigit():
+            return True
+        if span[-1] == len(amr.tokens) - 1:
+            return True
+    elif amr.nodes[n] == 'and':
+        semicolons = [span for span in amr.spans if ' '.join(amr.tokens[t] for t in span) == ';']
+        if span in semicolons[1:]:
+            return True
+        if token_label.isalpha() and token_label not in ['and', 'as well', 'as well as', 'with', 'plus', 'additionally', 'in addition', 'addition',
+                                                         'both', 'either', 'neither', 'nor', 'moreover', 'furthermore',]:
+            return True
+    elif amr.nodes[n] in ['more','have-degree-91','have-quant-91']:
+        if token_label == 'than':
+            return True
+    if token_label == 'these' and amr.nodes[n] not in ['these','this']:
+        return True
+    elif token_label == 'those' and amr.nodes[n] not in ['that','those','person','thing']:
+        return True
+    elif token_label == 'this' and amr.nodes[n] not in ['this']:
+        return True
+    elif token_label == 'whose' and amr.nodes[n] not in ['person','own-01','amr-unknown','have-03']:
+        return True
+    elif token_label == 'who' and amr.nodes[n] not in ['person','amr-unknown']:
+        return True
+    elif token_label == 'which' and amr.nodes[n] not in ['amr-unknown','thing']:
+        return True
+    elif token_label == 'have' and not amr.nodes[n].startswith('have'):
+        return True
+    elif token_label == 'be' and amr.nodes[n] not in ['be-02','exist-01']:
+        return True
+    elif token_label == 'will' and not amr.nodes[n].startswith('will'):
+        return True
+    return False
+
+
 def clean_subgraph(amr, alignments, align):
 
     if align.nodes and not is_subgraph(amr, align.nodes):
@@ -611,7 +709,7 @@ def clean_subgraph(amr, alignments, align):
             largest_align = max(components, key=lambda a:len(a.nodes))
             return largest_align
     if not align.tokens:
-        raise Exception()
+        raise Exception('Alignment Error, Missing Tokens:', amr.id, str(align))
     return align
 
 
@@ -621,6 +719,8 @@ def clean_alignments(amr, alignments):
         # if align2.type.startswith('dupl'): continue
         for n in align2.nodes:
             node_occurence[n] += 1
+            if n not in amr.nodes:
+                raise Exception('Alignment Error, Unrecognized Node:', amr.id, n)
     if any(node_occurence[n]>1 for n in node_occurence):
         ns = [n2 for n2 in node_occurence if node_occurence[n2]>1]
         for n in ns:

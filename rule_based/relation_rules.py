@@ -32,7 +32,7 @@ def rule_based_align_relations(amr, subgraph_alignments, relation_alignments):
                 add_relation_alignment(amr, relation_alignments, (s, r, t), salign.tokens)
         elif r == ':domain':
             add_relation_alignment(amr, relation_alignments, (s, r, t), salign.tokens)
-        elif r == ':mod':
+        elif r in [':mod',':name',':polarity',':li']:
             talign = amr.get_alignment(subgraph_alignments, node_id=t)
             if not talign: continue
             add_relation_alignment(amr, relation_alignments, (s, r, t), talign.tokens)
@@ -100,3 +100,10 @@ def rule_based_align_all_relations(amr, subgraph_alignments):
         align = amr.get_alignment(subgraph_alignments, node_id=anchor)
         if align:
             align.edges.append((s,r,t))
+
+
+def english_ignore_tokens(amr, span):
+    pos = amr.pos[span[0]]
+    if pos in ['IN','TO','POS','PRP$']:
+        return False
+    return True

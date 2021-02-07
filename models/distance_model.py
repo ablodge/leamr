@@ -51,10 +51,10 @@ class Gaussian_Distance_Model:
 
 class Skellam_Distance_Model:
 
-    def __init__(self):
+    def __init__(self, mean=0, stdev=10):
 
-        self.distance_mean = 0
-        self.distance_stdev = 10
+        self.distance_mean = mean
+        self.distance_stdev = stdev
         self._distribution_memo = {}
         self.mu2 = (self.distance_stdev ** 2 - self.distance_mean) / 2
         self.mu1 = self.distance_mean + self.mu2
@@ -80,6 +80,8 @@ class Skellam_Distance_Model:
                 idx2 = i
             if idx1 is not None and idx2 is not None:
                 break
+        if idx1 is None or idx2 is None:
+            raise Exception()
         return idx2 - idx1
 
     def logp(self, dist):

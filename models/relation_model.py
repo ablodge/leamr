@@ -4,11 +4,13 @@ from statistics import mean, stdev
 
 from amr_utils.alignments import AMR_Alignment
 
+from evaluate.utils import coverage
 from models.base_model import Alignment_Model
 from models.distance_model import Gaussian_Distance_Model, Skellam_Distance_Model
+from models.naive_model import Concept_Edge_Model
 from models.null_model import Null_Model
 from rule_based.relation_rules import rule_based_anchor_relation, rule_based_align_relations, exact_match_relations, \
-    normalize_relation
+    normalize_relation, english_ignore_tokens
 
 ENGLISH = True
 
@@ -17,117 +19,60 @@ class Relation_Model(Alignment_Model):
     def __init__(self, amrs, subgraph_alignments, alpha=1):
         super().__init__(amrs, alpha)
 
-        self.distance_model_parent = Skellam_Distance_Model()
-        self.distance_model_child = Skellam_Distance_Model()
+        self.distance_model_parent = Skellam_Distance_Model(mean=-1, stdev=2.)
+        self.distance_model_child = Skellam_Distance_Model(mean=+1, stdev=2.)
         self.null_model = Null_Model(self)
 
         self.subgraph_alignments = subgraph_alignments
 
-        self.edges_count = {}
+        self.edges_count = Counter()
         self.edges_total = 0
 
-        self.naive_translation_count = {}
-        self.naive_translation_total = 0
-        self.naive_edge_count = Counter()
-        self.naive_edge_total = 0
-        edge_labels = set()
-        for amr in amrs:
-            parents = {s:[] for s in amr.nodes}
-            children = {t:[] for t in amr.nodes}
-            taken_tokens = set()
-            for s,r,t in amr.edges:
-                parents[s].append((s,r,t))
-                children[t].append((s,r,t))
-            for align in subgraph_alignments[amr.id]:
-                token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-                if token_label not in self.naive_translation_count:
-                    self.naive_translation_count[token_label] = Counter()
-                for n in align.nodes:
-                    for e in parents[n]:
-                        s,r,t = e
-                        if t in align.nodes: continue
-                        partial_align = AMR_Alignment(type='relation', tokens=align.tokens, edges=[e])
-                        edge_label = self.get_alignment_label(amr, partial_align)
-                        self.naive_translation_count[token_label][edge_label] += 1
-                        edge_labels.add(edge_label)
-                        self.naive_edge_count[edge_label] += 1
-                    for e in children[n]:
-                        s, r, t = e
-                        if s in align.nodes: continue
-                        partial_align = AMR_Alignment(type='relation', tokens=align.tokens, edges=[e])
-                        edge_label = self.get_alignment_label(amr, partial_align)
-                        self.naive_translation_count[token_label][edge_label] += 1
-                        edge_labels.add(edge_label)
-                        self.naive_edge_count[edge_label] += 1
-                if not align.nodes and token_label not in taken_tokens:
-                    edges = set()
-                    for e in amr.edges:
-                        partial_align = AMR_Alignment(type='relation', tokens=align.tokens, edges=[e])
-                        edge_label = self.get_alignment_label(amr, partial_align)
-                        edges.add(edge_label)
-                    for edge_label in edges:
-                        self.naive_translation_count[token_label][edge_label] += 1
-                        self.naive_edge_count[edge_label] += 1
-                    taken_tokens.add(token_label)
-        self.naive_translation_total = sum(self.naive_translation_count[t][s] for t in self.naive_translation_count for s in self.naive_translation_count[t])
-        self.naive_translation_total += len(self.tokens_count)*len(edge_labels)*self.alpha
-        self.naive_edge_total = sum(self.naive_edge_count[e] for e in self.naive_edge_count)
-        self.naive_edge_total += self.alpha*len(self.naive_edge_count)
-
+        self.concept_edge_model = Concept_Edge_Model(mode='relation')
+        self.concept_edge_model.update_parameters(amrs)
 
     def trans_logp(self, amr, alignments, align):
 
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
         align_label = self.get_alignment_label(amr, align)
+        sub_align = amr.get_alignment(self.subgraph_alignments, token_id=align.tokens[0])
 
-        if not align.edges:
-            return self.null_model.logp(token_label)
+        if not align.edges and not sub_align.nodes:
+            return self.null_model.logp(amr, token_label, align.tokens[0])
         elif token_label in self.translation_count and align_label in self.translation_count[token_label]:
             trans_logp = super().logp(amr, alignments, align)
         else:
-            trans_logp = 0
-            for e in align.edges:
-                partial_align = AMR_Alignment(type='relation', tokens=align.tokens, edges=[e])
-                trans_logp += math.log(self.naive_translation_count[token_label][self.get_alignment_label(amr, partial_align)] + self.alpha) \
-                              - math.log(self.naive_translation_total)
-                trans_logp -= math.log(self.tokens_count[token_label]+self.alpha) - math.log(self.tokens_total)
+            trans_logp = self.concept_edge_model.factorized_logp(amr, align)
         return trans_logp
 
     def inductive_bias(self, amr, alignments, align):
         token_label = ' '.join(amr.lemmas[t] for t in align.tokens)
-        align_label = self.get_alignment_label(amr, align)
-
-        if not align.edges:
-            return self.null_model.inductive_bias(token_label)
-        trans_logp = self.trans_logp(amr, alignments, align)
-        token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
-        if align_label in self.edges_count:
-            edge_logp = math.log(self.edges_count[align_label] + self.alpha) - math.log(self.edges_total)
+        subgraph_label = self.get_alignment_label(amr, align)
+        if not align.nodes:
+            inductive_bias = self.null_model.inductive_bias(token_label)
         else:
-            edge_logp = 0
-            for e in align.edges:
-                partial_align = AMR_Alignment(type='relation', tokens=align.tokens, edges=[e])
-                edge_logp -= math.log(self.naive_edge_count[self.get_alignment_label(amr, partial_align)] + self.alpha) - math.log(self.naive_edge_total)
-            edge_logp /= len(align.edges)
-
-        return trans_logp + token_logp - edge_logp
-
+            inductive_bias = self.concept_edge_model.inductive_bias(amr, align, subgraph_label)
+        return 0 #inductive_bias
 
     def logp(self, amr, alignments, align):
         trans_logp = self.trans_logp(amr, alignments, align)
         inductive_bias = self.inductive_bias(amr, alignments, align)
         dist_logp = self.distance_logp(amr, alignments, align)
 
-        return trans_logp + dist_logp + inductive_bias
+        return trans_logp + dist_logp #+ inductive_bias
 
     def get_alignment_label(self, amr, align):
         sub_align = amr.get_alignment(self.subgraph_alignments, token_id=align.tokens[0])
         if not align.edges:
-            return '<null>'
+            if sub_align.nodes:
+                return '<no_args>'
+            else:
+                return '<null>'
         internal_nodes = [n for n in sorted(sub_align.nodes)]
         internal_nodes = {n:f'n{i}' for i,n in enumerate(internal_nodes)}
         new_edges = []
         for e in align.edges:
+            e = normalize_relation(e)
             s,r,t = normalize_relation(e)
             s = internal_nodes[s] if s in internal_nodes else 'v'
             t = internal_nodes[t] if t in internal_nodes else 'v'
@@ -199,7 +144,7 @@ class Relation_Model(Alignment_Model):
     def get_unaligned(self, amr, alignments):
         unaligned = set(amr.edges)
         for align in alignments[amr.id]:
-            if align.type!='relation': continue
+            # if align.type!='relation': continue
             for e in align.edges:
                 if e in unaligned:
                     unaligned.remove(e)
@@ -256,6 +201,7 @@ class Relation_Model(Alignment_Model):
             rule_based_align_relations(amr, self.subgraph_alignments, relation_alignments)
             exact_match_relations(amr, self.subgraph_alignments, relation_alignments)
         print('\r', end='')
+        print('Preprocessing coverage:', coverage(amrs, relation_alignments, mode='edges'))
         return relation_alignments
 
 
@@ -287,6 +233,7 @@ class Relation_Model(Alignment_Model):
         # get candidates
         candidate_spans = [align.tokens for align in self.subgraph_alignments[amr.id] if not align.nodes]
         candidate_spans = [span for span in candidate_spans if not amr.get_alignment(relation_alignments, token_id=span[0])]
+        candidate_spans = [span for span in candidate_spans if not english_ignore_tokens(amr, span)]
         candidate_neighbors = rule_based_anchor_relation(e)
 
         readable = []
@@ -296,16 +243,21 @@ class Relation_Model(Alignment_Model):
             new_align = AMR_Alignment(type='relation', tokens=span, edges=[e], amr=amr)
             replaced_align = AMR_Alignment(type='relation', tokens=span, edges=[], amr=amr)
             scores1[i] = self.logp(amr, relation_alignments, new_align) - self.logp(amr, relation_alignments, replaced_align)
+            scores1[i] += self.inductive_bias(amr, relation_alignments, new_align) - self.inductive_bias(amr, relation_alignments, replaced_align)
             aligns1[i] = new_align
             # readable.append(self.readable_logp(amr,alignments, new_align))
         scores2 = {}
         aligns2 = {}
         for i, neighbor in enumerate(candidate_neighbors):
-            span = amr.get_alignment(self.subgraph_alignments, node_id=neighbor).tokens
+            sub_align = amr.get_alignment(self.subgraph_alignments, node_id=neighbor)
+            span = sub_align.tokens
             if not span: continue
+            if span not in amr.spans:
+                raise Exception('Subgraph Alignment has Faulty Span:', span)
             replaced_align = amr.get_alignment(relation_alignments, token_id=span[0])
             new_align = AMR_Alignment(type='relation', tokens=replaced_align.tokens, edges=replaced_align.edges+[e], amr=amr)
             scores2[i] = self.logp(amr, relation_alignments, new_align) - self.logp(amr, relation_alignments, replaced_align)
+            scores2[i] += self.inductive_bias(amr, relation_alignments, new_align) - self.inductive_bias(amr, relation_alignments, replaced_align)
             aligns2[i] = new_align
             # readable.append(self.readable_logp(amr, alignments, new_align))
 

@@ -5,7 +5,13 @@ from amr_utils.style import HTML_AMR
 class Display:
 
     @staticmethod
-    def style(amrs, outfile):
+    def style(amrs, outfile, alignments=None):
+        if alignments:
+            for amr in amrs:
+                if amr.id in alignments:
+                    amr.alignments = alignments[amr.id]
+                else:
+                    amr.alignments = []
         output = HTML_AMR.style(amrs[:5000],
                                 assign_node_color=Display.node_color,
                                 assign_token_color=Display.token_color,

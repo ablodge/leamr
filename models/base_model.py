@@ -2,6 +2,7 @@ import math
 import sys
 from collections import Counter
 
+from amr_utils.alignments import AMR_Alignment
 from tqdm import tqdm
 
 
@@ -102,39 +103,48 @@ class Alignment_Model:
                 if debug:
                     old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
                     readable = [(all_scores[(n,span)],
+                                 list(span), n,
                                 self.get_alignment_label(amr, candidate_aligns[(n,span)]),
                                  ' '.join(amr.lemmas[t] for t in span),
                                  self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
-                                 self.readable_logp(amr, alignments, old_alignments[span]),
+                                 self.readable_logp(amr, alignments, old_alignments[span]) if span in old_alignments else None,
                                  ) for n,span in all_scores.keys()]
                     readable = [x for x in sorted(readable, key=lambda y :y[0], reverse=True)]
+                    # dist1 = self.distance_logp(amr, alignments, AMR_Alignment(tokens=[6], nodes=['1.2.1.2.1']))
+                    # dist2 = self.distance_logp(amr, alignments, AMR_Alignment(tokens=[31], nodes=['1.2.1.2.1']))
                     print(end='')
+
 
                 # add node to alignment
                 found = False
                 for i, align in enumerate(alignments[amr.id]):
+                    if align.type.startswith('dupl') or align.type.startswith('reentrancy'): continue
                     if align.tokens == span and align.type == new_align.type:
-                        if align.type == 'dupl-subgraph':
-                            continue
                         alignments[amr.id][i] = new_align
                         found = True
                         break
                 if not found:
                     alignments[amr.id].append(new_align)
 
+                l1 = len(unaligned)
                 unaligned = self.get_unaligned(amr, alignments)
+                l2 = len(unaligned)
+                if l2 >= l1:
+                    raise Exception('Infinite Loop:', amr.id)
 
             amr.alignments = alignments[amr.id]
             self.postprocess_alignments(amr, alignments)
 
-            tally = 0
-            for align in alignments[amr.id]:
-                logp = self.logp(amr, alignments, align)
-                if math.isinf(logp): continue
-                tally -= logp / math.log(2.0)
-            perplexity = math.pow(2.0, tally / len(alignments[amr.id]))
-            if perplexity>1e6 and len(amr.spans)>1:
-                print('\rhigh perplexity:',amr.id, perplexity)
+            # tally = 0
+            # for align in alignments[amr.id]:
+            #     logp = self.logp(amr, alignments, align)
+            #     if math.isinf(logp): continue
+            #     tally = - logp / math.log(2.0)
+            # perplexity = math.pow(2.0, tally/len(alignments[amr.id]))
+            # if perplexity>1e6 and len(amr.spans)>1:
+            #     readable = [(math.pow(2.0, -self.logp(amr, alignments, align)/math.log(2.0)),
+            #                  self.readable_logp(amr, alignments, align)) for align in alignments[amr.id]]
+            #     print('\rhigh perplexity:',amr.id, perplexity, ' '.join(amr.tokens), file=sys.stderr)
 
 
         return alignments

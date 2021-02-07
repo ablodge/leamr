@@ -11,6 +11,8 @@ from tqdm import tqdm
 
 from rule_based import mwes
 
+SEE_GOLD_AMR = True
+
 
 def add_nlp_data(amrs, file):
     lemmas_file = file.replace('.txt', '') + '.lemmas.json'
@@ -22,6 +24,9 @@ def add_nlp_data(amrs, file):
     coref_file = file.replace('.txt', '') + '.coref.json'
     with open(coref_file, 'r') as f:
         corefs = json.load(f)
+    pos_file = file.replace('.txt', '') + '.pos.json'
+    with open(pos_file, 'r') as f:
+        pos = json.load(f)
     for amr in amrs:
         amr_id = amr.id
         if amr_id.endswith('#2'):
@@ -29,13 +34,15 @@ def add_nlp_data(amrs, file):
         amr.lemmas = lemmas[amr_id]
         amr.spans = spans[amr_id]
         amr.coref = corefs[amr_id]
+        amr.pos = pos[amr.id]
 
 
 
 def get_mwe_types_by_first_token():
     hyphenated = [' - '.join(mwe.split()) for mwe in mwes.OTHER_MWES]
     all_mwe_types = set(mwes.PMWES + mwes.VMWES + mwes.OTHER_MWES + mwes.HAND_ADDED_MWES + hyphenated)
-    all_mwe_types = {tuple(mwe.split()) for mwe in all_mwe_types}
+    all_mwe_types = [tuple(mwe.split()) for mwe in all_mwe_types]
+    all_mwe_types = [mwe for mwe in sorted(all_mwe_types, key=lambda x:len(x), reverse=True)]
     all_mwe_types_dict = {}
     for mwe in all_mwe_types:
         first = mwe[0]
@@ -101,6 +108,7 @@ def main():
     amrs = cr.load(amr_file, remove_wiki=True)
 
     lemmas_json = {}
+    pos_json = {}
     ner_spans = {}
     mwe_spans = {}
     multi_word_spans = {}
@@ -116,7 +124,7 @@ def main():
 
     enum_amrs = [_ for _ in enumerate(amrs)]
     for amr_idx, amr in tqdm(enum_amrs):
-        tokens = amr.tokens
+        tokens = amr.tokens.copy()
         for i,tok in enumerate(tokens):
             if tok.startswith('@') and tok.endswith('@') and len(tok)==3:
                 tokens[i] = tok[1]
@@ -197,11 +205,14 @@ def main():
                 #     print()
 
         lemmas = ['' for _ in amr.tokens]
+        pos = ['' for _ in amr.tokens]
         for i in stanza_lemmas:
             lemmas[convert_ids[i]] += stanza_lemmas[i]
+            pos[convert_ids[i]] = stanza_pos[i]
         for i,l in enumerate(lemmas):
             if not l and i>0:
                 lemmas[i] = lemmas[i-1]
+                pos[i] = pos[i-1]
         entities = []
         for span in stanza_entity_spans:
             span = [convert_ids[i] for i in span]
@@ -209,6 +220,7 @@ def main():
             end = max(span)+1
             entities.append((start,end))
         lemmas_json[amr.id] = lemmas
+        pos_json[amr.id] = pos
         ner_spans[amr.id] = entities
 
         # get MWE spans
@@ -217,7 +229,8 @@ def main():
         for i, token in enumerate(amr.tokens):
             if i in taken: continue
             found = False
-            lemma = lemmas[i]
+            token = token.lower()
+            lemma = lemmas[i].lower()
             if token in mwe_types:
                 for mwe in mwe_types[token]:
                     size = len(mwe)
@@ -242,11 +255,80 @@ def main():
                         break
             taken.append(i)
 
+        # look for names matching gold amr
+        name_spans = []
+        if SEE_GOLD_AMR:
+            for n in amr.nodes:
+                if amr.nodes[n] == 'name':
+                    parts = [(int(r[3:]), t) for s, r, t in amr.edges if s == n and r.startswith(':op')]
+                    parts = [t for r, t in sorted(parts, key=lambda x: x[0])]
+                    label = ' '.join(amr.nodes[t].replace('"', '') for t in parts)
+                    name_type = [s for s,r,t in amr.edges if t==n and r==':name']
+                    name_type = amr.nodes[name_type[0]] if name_type else None
+                    if parts:
+                        for start in range(len(amr.tokens)):
+                            span = [t for t in range(start, start + len(parts))]
+                            if span[-1] >= len(amr.tokens): break
+                            tokens = [amr.tokens[t] for t in span]
+                            token_label = ' '.join([tok for tok in tokens if tok != '"'])
+                            if token_label.lower() == label.lower():
+                                next_tok = span[-1] + 1
+                                if next_tok < len(amr.tokens) and amr.tokens[next_tok] == name_type:
+                                    span += [next_tok]
+                                if len(parts)>1:
+                                    name_spans.append((span[0],span[-1]+1))
+                                start = span[0]
+                                end = span[-1]+1
+                                for span in ner_spans[amr.id][:]:
+                                    if span[0] <= start < span[1] and span[0] < end <= span[1] and (start,end)!=span:
+                                        ner_spans[amr.id].remove(span)
+                                        break
+                                break
+            for t in range(len(amr.tokens)):
+                if t+2<len(amr.tokens) and amr.tokens[t+1]=='@-@':
+                    label1 = f'{lemmas[t]}{lemmas[t+2]}'.lower()[:len(lemmas[t])+4]
+                    label2 = f'{lemmas[t]}-{lemmas[t+2]}'.lower()[:len(lemmas[t])+5]
+                    if any(amr.nodes[n].startswith(label1) or amr.nodes[n].startswith(label2) for n in amr.nodes):
+                        name_spans.append((t,t+3))
+        # times
+        taken = set()
+        for t in range(len(amr.tokens)):
+            if t in taken: continue
+            start = t
+            if amr.tokens[t].isdigit() and len(amr.tokens[t])<=2 and t+2<len(amr.tokens):
+                if amr.tokens[t+1] in ['@:@',':'] and amr.tokens[t+2].isdigit() and len(amr.tokens[t+2])==2:
+                    end = t+2
+                    while end+1<len(amr.tokens) \
+                        and (amr.tokens[end+1] in ['am','pm','a.m.','p.m.','@:@',':','UTC','GMT','EST',
+                                                   'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday',]
+                             or (amr.tokens[end] in ['@:@',':'] and amr.tokens[end+1].isdigit() and len(amr.tokens[end+1])==2)):
+                        end += 1
+                    end += 1
+                    time = ' '.join(amr.tokens[t] for t in range(start, end))
+                    name_spans.append((start, end))
+                    for span in ner_spans[amr.id]:
+                        if start<span[1]<end and span[0]<start:
+                            name_spans[-1] = (span[0],end)
+                            break
+                        elif start<span[0]<end and span[1]>end:
+                            name_spans[-1] = (start, span[1])
+                            break
+                        elif span[0]<=start<span[1] and span[0]<end<=span[1]:
+                            name_spans[-1] = span
+                            break
+                    start, end = name_spans[-1]
+                    for i in range(start,end):
+                        taken.add(i)
         multi_word_spans[amr.id] = []
         taken = set()
         for i, tok in enumerate(amr.tokens):
             if i in taken: continue
-            if any(i==span[0] for span in ner_spans[amr.id]):
+            if any(i==span[0] for span in name_spans):
+                span = [s for s in name_spans if s[0]<=i<s[1]][0]
+                span = [i for i in range(span[0],span[1])]
+                multi_word_spans[amr.id].append(span)
+                taken.update(span)
+            elif any(i==span[0] for span in ner_spans[amr.id]):
                 span = [s for s in ner_spans[amr.id] if s[0]<=i<s[1]][0]
                 span = [i for i in range(span[0],span[1])]
                 multi_word_spans[amr.id].append(span)
@@ -269,6 +351,8 @@ def main():
     filename = amr_file.replace('.txt','')
     with open(filename+'.lemmas.json', 'w+',encoding='utf8') as f:
         json.dump(lemmas_json, f)
+    with open(filename+'.pos.json', 'w+',encoding='utf8') as f:
+        json.dump(pos_json, f)
     with open(filename+'.spans.json', 'w+',encoding='utf8') as f:
         json.dump(multi_word_spans, f)
     if coreferences:
