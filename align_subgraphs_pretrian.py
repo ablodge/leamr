@@ -2,7 +2,7 @@ import sys
 from collections import Counter
 
 from amr_utils.alignments import load_from_json, convert_alignment_to_subgraph, AMR_Alignment, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 from amr_utils.graph_utils import get_rooted_components
 
 from tqdm import tqdm
@@ -94,7 +94,7 @@ def main():
     amr_file = sys.argv[1]
     align_file = sys.argv[1].replace('.txt','')+'.node_alignments.json'
 
-    cr = JAMR_AMR_Reader()
+    cr = AMR_Reader()
     amrs = cr.load(amr_file, remove_wiki=True)
     # amrs = [amr for amr in amrs if amr.id == 'bolt12_10465_5592.3']
     if TRAIN_CAP is not None:

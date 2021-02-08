@@ -2,7 +2,7 @@ import json
 import sys
 
 import spacy
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 import stanza
 import neuralcoref
@@ -104,8 +104,8 @@ def main():
     # stanza.download('en')
     nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma,ner')
 
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
 
     lemmas_json = {}
     pos_json = {}

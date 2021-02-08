@@ -1,8 +1,8 @@
 import csv
 import sys
 
-from amr_utils.alignments import AMR_Alignment, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.alignments import AMR_Alignment
+from amr_utils.amr_readers import AMR_Reader
 
 from rule_based.subgraph_rules import is_subgraph
 
@@ -42,8 +42,8 @@ def main():
     amr_file = sys.argv[1]
     hand_alignments_file = sys.argv[2]
 
-    amr_reader = JAMR_AMR_Reader()
-    amrs = amr_reader.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
     amrs = {amr.id:amr for amr in amrs}
 
     subgraph_alignments = {}
@@ -164,15 +164,15 @@ def main():
     # amr_file = amr_file.replace('.txt', '.jakob')
     align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments.gold.json'
     print(f'Writing subgraph alignments to: {align_file}')
-    write_to_json(align_file, subgraph_alignments)
+    reader.save_alignments_to_json(align_file, subgraph_alignments)
 
     align_file = amr_file.replace('.txt', '') + f'.relation_alignments.gold.json'
     print(f'Writing relation alignments to: {align_file}')
-    write_to_json(align_file, relation_alignments)
+    reader.save_alignments_to_json(align_file, relation_alignments)
 
     align_file = amr_file.replace('.txt', '') + f'.reentrancy_alignments.gold.json'
     print(f'Writing reentrancy alignments to: {align_file}')
-    write_to_json(align_file, reentrancy_alignments)
+    reader.save_alignments_to_json(align_file, reentrancy_alignments)
 
     # amrs = [amr for amr_id,amr in amrs.items() if amr_id in subgraph_alignments]
     # for amr in amrs:

@@ -16,6 +16,7 @@ def coverage(amrs, alignments, mode='nodes'):
             total+=1
     return f'{100*coverage_count/total:.2f}%'
 
+
 SEP = '\t'
 
 def evaluate(amrs, pred_alignments, gold_alignments, mode='nodes'):

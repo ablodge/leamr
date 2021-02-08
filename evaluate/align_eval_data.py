@@ -1,7 +1,6 @@
 import sys
 
-from amr_utils.alignments import load_from_json, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 from display import Display
 from evaluate.utils import evaluate
@@ -25,15 +24,15 @@ def main():
     train_amr_file = sys.argv[2]
     eval_amr_file = sys.argv[3]
 
-    cr = JAMR_AMR_Reader()
-    train_amrs = cr.load(train_amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    train_amrs = reader.load(train_amr_file, remove_wiki=True)
     add_nlp_data(train_amrs, train_amr_file)
 
-    eval_amrs = cr.load(eval_amr_file, remove_wiki=True)
+    eval_amrs = reader.load(eval_amr_file, remove_wiki=True)
     add_nlp_data(eval_amrs, eval_amr_file)
-    gold_dev_alignments = load_from_json(sys.argv[4], eval_amrs)
+    gold_dev_alignments = reader.load_alignments_from_json(sys.argv[4], eval_amrs)
 
-    train_alignments = load_from_json(train_align_file, train_amrs)
+    train_alignments = reader.load_alignments_from_json(train_align_file, train_amrs)
 
     align_model = Subgraph_Model(train_amrs, align_duplicates=True)
     align_model.update_parameters(train_amrs, train_alignments)
@@ -47,7 +46,7 @@ def main():
     # write output
     align_file = eval_amr_file.replace('.txt', '') + f'.subgraph_alignments.json'
     print(f'Writing subgraph alignments to: {align_file}')
-    write_to_json(align_file, eval_alignments)
+    reader.save_alignments_to_json(align_file, eval_alignments)
     for amr in eval_amrs:
         amr.alignments = eval_alignments[amr.id]
     Display.style(eval_amrs, eval_amr_file.replace('.txt', '') + f'.subgraphs.html')

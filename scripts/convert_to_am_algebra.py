@@ -1,8 +1,8 @@
 import csv
 import sys
 
-from amr_utils.alignments import load_from_json, convert_alignment_to_subgraph
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.alignments import convert_alignment_to_subgraph
+from amr_utils.amr_readers import AMR_Reader
 
 from nlp_data import add_nlp_data
 from rule_based.relation_rules import rule_based_align_all_relations
@@ -220,13 +220,13 @@ def main():
     conll = load_conll(conll_file)
 
     amr_file = sys.argv[2]
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
 
     add_nlp_data(amrs, amr_file)
 
     align_file = sys.argv[3]
-    subgraph_alignments = load_from_json(align_file, amrs)
+    subgraph_alignments = reader.load_alignments_from_json(align_file, amrs)
 
     for amr in amrs:
         rule_based_align_all_relations(amr, subgraph_alignments)

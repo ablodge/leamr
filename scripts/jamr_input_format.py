@@ -1,12 +1,12 @@
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 
 def main():
     file = 'data/szubert/szubert_amrs.txt'
     output = 'data/szubert/szubert_amrs.jamr.txt'
 
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(file, remove_wiki=True)
 
     with open(output, 'w+') as f:
         for amr in amrs:

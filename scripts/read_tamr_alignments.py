@@ -1,7 +1,7 @@
 import os
 
-from amr_utils.alignments import AMR_Alignment, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.alignments import AMR_Alignment
+from amr_utils.amr_readers import AMR_Reader
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
 
     file2 = '../data/tamr/ldc_train_2017.txt'
 
-    reader = JAMR_AMR_Reader()
+    reader = AMR_Reader()
     amrs = reader.load(szubert_amrs, remove_wiki=True)
     amrs2 = reader.load(file2, remove_wiki=True)
 
@@ -99,7 +99,7 @@ def main():
                     alignments[amr.id].append(align)
             alignments[amr.id] = [align for align in sorted(alignments[amr.id], key=lambda a:a.tokens[0])]
 
-    write_to_json(output, alignments)
+    reader.save_alignments_to_json(output, alignments)
 
 
 if __name__=='__main__':

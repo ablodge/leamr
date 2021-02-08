@@ -1,7 +1,6 @@
 import sys
 
-from amr_utils.alignments import write_to_json, load_from_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 from display import Display
 from evaluate.utils import evaluate, perplexity
@@ -9,20 +8,20 @@ from models.subgraph_model import Subgraph_Model
 from nlp_data import add_nlp_data
 
 
-def report_progress(amrs, amr_file, alignments, epoch=None):
+def report_progress(amrs, amr_file, alignments, reader, epoch=None):
     epoch = '' if epoch is None else f'.epoch{epoch}'
     Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.subgraph_alignments{epoch}.html')
 
     align_file = amr_file.replace('.txt', '') + f'.subgraph_alignments{epoch}.json'
     print(f'Writing subgraph alignments to: {align_file}')
-    write_to_json(align_file, alignments)
+    reader.save_alignments_to_json(align_file, alignments)
 
 def get_eval_data(reader):
     if len(sys.argv) > 2:
         eval_amr_file = sys.argv[2]
         eval_amrs = reader.load(eval_amr_file, remove_wiki=True)
         add_nlp_data(eval_amrs, eval_amr_file)
-        gold_dev_alignments = load_from_json(sys.argv[3], eval_amrs)
+        gold_dev_alignments = reader.load_alignments_from_json(sys.argv[3], eval_amrs)
         return eval_amr_file, eval_amrs, gold_dev_alignments
     return None, None, None
 
@@ -31,8 +30,8 @@ def main():
 
     amr_file = sys.argv[1]
 
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
     # amrs = amrs[:100]
     add_nlp_data(amrs, amr_file)
 
@@ -51,7 +50,7 @@ def main():
         print(f'Epoch {i}: Training data')
         alignments = align_model.align_all(amrs)
         align_model.update_parameters(amrs, alignments)
-        report_progress(amrs, amr_file, alignments, i)
+        report_progress(amrs, amr_file, alignments, reader, epoch=i)
         print()
 
         if eval_amrs:
@@ -61,10 +60,10 @@ def main():
             evaluate(eval_amrs, eval_alignments, gold_dev_alignments)
             print()
 
-    report_progress(amrs, amr_file, alignments)
+    report_progress(amrs, amr_file, alignments, reader)
 
     if eval_amrs:
-        report_progress(eval_amrs, eval_amr_file, eval_alignments)
+        report_progress(eval_amrs, eval_amr_file, eval_alignments, reader)
 
 if __name__=='__main__':
     main()

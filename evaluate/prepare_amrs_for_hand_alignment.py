@@ -1,8 +1,7 @@
 import sys
 import random
 
-from amr_utils.alignments import load_from_json
-from amr_utils.amr_readers import LDC_AMR_Reader, JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 from amr_utils.style import HTML_AMR
 
 from display import Display
@@ -60,25 +59,23 @@ def get_edge_labels(amr):
 def load_szubert_data(amr_file):
 
     # Szubert data
-    cr = LDC_AMR_Reader()
-    amrs1 = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs1 = reader.load(amr_file, remove_wiki=True)
     amr_ids = [amr.id for amr in amrs1]
     for amr_id in amr_ids:
         if amr_ids.count(amr_id)>1:
             print('Repeated:', amr_id)
 
     # LDC data
-    cr = JAMR_AMR_Reader()
     amrs2 = []
-    amrs2 += cr.load('data/ldc_train.txt', remove_wiki=True)
-    amrs2 += cr.load('data/ldc_dev.txt', remove_wiki=True)
-    amrs2 += cr.load('data/ldc_test.txt', remove_wiki=True)
+    amrs2 += reader.load('data/ldc_train.txt', remove_wiki=True)
+    amrs2 += reader.load('data/ldc_dev.txt', remove_wiki=True)
+    amrs2 += reader.load('data/ldc_test.txt', remove_wiki=True)
     amrs = [amr for amr in amrs2 if amr.id in amr_ids]
     ldc_ids = [amr.id for amr in amrs]
 
     # Little Prince data
-    cr = LDC_AMR_Reader()
-    amrs3 = cr.load('data/little_prince.txt', remove_wiki=True)
+    amrs3 = reader.load('data/little_prince.txt', remove_wiki=True)
     little_prince_ids = [amr.id for amr in amrs3 if amr.id in amr_ids]
     amrs += [amr for amr in amrs3 if amr.id in little_prince_ids]
 
@@ -99,11 +96,11 @@ def main():
     alignment_file = sys.argv[2]
     relation_alignment_file = sys.argv[3]
 
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
 
-    subgraph_alignments = load_from_json(alignment_file, amrs)
-    relation_alignments = load_from_json(relation_alignment_file, amrs)
+    subgraph_alignments = reader.load_alignments_from_json(alignment_file, amrs)
+    relation_alignments = reader.load_alignments_from_json(relation_alignment_file, amrs)
 
     amrs = [amr for amr in amrs if amr.id in subgraph_alignments]
     for amr in amrs:

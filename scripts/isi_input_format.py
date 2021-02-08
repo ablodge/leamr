@@ -1,4 +1,4 @@
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 
 def main():
@@ -9,9 +9,9 @@ def main():
     output2 = 'data/szubert/szubert_amrs.isi.txt'
     output3 = 'data/szubert/szubert_ids.isi.txt'
 
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(file, remove_wiki=True)
-    amrs += cr.load(file2, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(file, remove_wiki=True)
+    amrs += reader.load(file2, remove_wiki=True)
     unique_ids = set()
     amrs2 = []
     for amr in amrs:

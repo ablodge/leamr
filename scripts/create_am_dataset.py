@@ -1,16 +1,15 @@
 import sys
 
-from amr_utils.alignments import load_from_json
-from amr_utils.amr_readers import JAMR_AMR_Reader
+from amr_utils.amr_readers import AMR_Reader
 
 
 def main():
     amr_file = sys.argv[1]
     align_file = sys.argv[2]
-    cr = JAMR_AMR_Reader()
-    amrs = cr.load(amr_file, remove_wiki=True)
+    reader = AMR_Reader()
+    amrs = reader.load(amr_file, remove_wiki=True)
 
-    subgraph_alignments = load_from_json(align_file, amrs)
+    subgraph_alignments = reader.load_alignments_from_json(align_file, amrs)
     for amr_id in subgraph_alignments:
         if any(align.type!='subgraph' for align in subgraph_alignments[amr_id]):
             subgraph_alignments[amr_id] = [align for align in subgraph_alignments[amr_id] if align.type=='subgraph']

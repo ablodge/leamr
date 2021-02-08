@@ -1,5 +1,5 @@
-from amr_utils.alignments import AMR_Alignment, write_to_json
-from amr_utils.amr_readers import JAMR_AMR_Reader, Graph_AMR_Reader
+from amr_utils.alignments import AMR_Alignment
+from amr_utils.amr_readers import AMR_Reader
 import penman
 
 
@@ -54,7 +54,7 @@ def main():
 
     amr_file1 = '../data/ldc_train.txt'
     amr_file2 = '../data/szubert/szubert_amrs.txt'
-    reader = JAMR_AMR_Reader()
+    reader = AMR_Reader()
     amrs = reader.load(amr_file1, remove_wiki=True)
     szubert_amrs = reader.load(amr_file2, remove_wiki=True)
     szubert_amr_ids = [amr.id for amr in szubert_amrs]
@@ -67,39 +67,7 @@ def main():
             if line:
                 amr_ids.append(line.strip())
 
-    reader = Graph_AMR_Reader()
-    alignments = {amr_id:[] for amr_id in amr_ids}
-    isi_amrs = []
-    with open(file, encoding='utf8') as f:
-        i = 0
-        tokens = []
-        for line in f:
-            if line.startswith('#'):
-                line = line[2:].strip()
-                tokens = [t for t in line.split()]
-                tokens = [t.split('_')[0] for t in tokens]
-            elif line.startswith('('):
-                amr_id = amr_ids[i]
-                aligns = alignments[amr_id]
-                g = penman.decode(line, model=TreePenmanModel())
-                amr, triples, _node_map = reader.parse_amr_(tokens,line)
-                amr.id = amr_id
-                isi_amrs.append(amr)
-                new_node = 0
-                for e, epidata in g.epidata.items():
-                    for align in epidata:
-                        if 'Alignment' in type(align).__name__:
-                            indices = align.indices
-                            if e[1]==':instance':
-                                align = AMR_Alignment(type='node', tokens=list(indices), nodes=[e[0]])
-                            elif not e[2][0].isalpha() or e[2] in ['imperative','expressive','interrogative']:
-                                align = AMR_Alignment(type='node', tokens=list(indices), nodes=[_node_map[e]])
-                                new_node+=1
-                            else:
-                                align = AMR_Alignment(type='edge', tokens=list(indices), edges=[e])
-                            aligns.append(align)
-
-                i+=1
+    isi_amrs, isi_alignments = reader.load(file, output_alignments=True)
 
     subgraph_alignments = {}
     relation_alignments = {}
@@ -110,7 +78,7 @@ def main():
             raise Exception('Inconsistent Tokenization:', amr.id)
         node_labels = node_map(isi_amr, amr)
         edge_labels = edge_map(isi_amr, amr)
-        isi_aligns = alignments[amr.id]
+        isi_aligns = isi_alignments[amr.id]
         subgraph_alignments[amr.id] = []
         relation_alignments[amr.id] = []
         for i,tok in enumerate(amr.tokens):
@@ -119,8 +87,8 @@ def main():
             edges = [edge_labels[e] for align in aligns for e in align.edges]
             subgraph_alignments[amr.id].append(AMR_Alignment(type='subgraph', tokens=[i], nodes=nodes))
             relation_alignments[amr.id].append(AMR_Alignment(type='relation', tokens=[i], edges=edges))
-    write_to_json(output.replace('.txt','.subgraph_alignments.json'), subgraph_alignments)
-    write_to_json(output.replace('.txt', '.relation_alignments.json'), relation_alignments)
+    reader.save_alignments_to_json(output.replace('.txt','.subgraph_alignments.json'), subgraph_alignments)
+    reader.save_alignments_to_json(output.replace('.txt', '.relation_alignments.json'), relation_alignments)
 
     for amr in szubert_amrs:
         if amr.id not in subgraph_alignments:
