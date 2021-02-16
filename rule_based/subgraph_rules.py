@@ -2,7 +2,7 @@ import re
 from collections import Counter
 
 from amr_utils.alignments import AMR_Alignment
-from amr_utils.graph_utils import is_rooted_dag, get_rooted_components
+from amr_utils.graph_utils import is_rooted_dag, get_connected_components
 
 
 def postprocess_subgraph(amr, alignments, align, english=False):
@@ -42,7 +42,7 @@ def postprocess_subgraph(amr, alignments, align, english=False):
         if t in align.nodes and s not in align.nodes:
             if r == ':name' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
-            elif amr.nodes[s] == 'publication-91' and r == ':ARG1' and not amr.get_alignment(alignments, node_id=s):
+            if amr.nodes[s] == 'publication-91' and r == ':ARG1' and not amr.get_alignment(alignments, node_id=s):
                 align.nodes.append(s)
         if s in align.nodes and t not in align.nodes:
             if amr.nodes[s] == 'name' and r.startswith(':op'):
@@ -742,23 +742,18 @@ def separate_components(amr, align):
         return [align]
     if is_subgraph(amr, align.nodes):
         return [align]
-    sub = amr.get_subgraph(align.nodes)
-    components = get_rooted_components(sub)
+    components = get_connected_components(amr, align.nodes)
     components = [list(sub.nodes.keys()) for sub in components]
     components = [AMR_Alignment(type='subgraph', tokens=align.tokens, nodes=nodes, amr=amr) for nodes in components]
     return components
 
 
 def is_subgraph(amr, nodes):
-    subamr = amr.get_subgraph(nodes)
-    for s,r,t in subamr.edges[:]:
-        if t==subamr.root:
-            subamr.edges.remove((s,r,t))
-    if is_rooted_dag(subamr):
+    if is_rooted_dag(amr, nodes):
         return True
     # handle "never => ever, -" and other similar cases
-    if len(subamr.nodes) == 2:
-        nodes = [n for n in subamr.nodes]
+    if len(nodes) == 2:
+        nodes = nodes.copy()
         parents1 = [s for s, r, t in amr.edges if t == nodes[0]]
         parents2 = [s for s, r, t in amr.edges if t == nodes[1]]
         children = [t for s, r, t in amr.edges if s in nodes]

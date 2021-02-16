@@ -104,8 +104,8 @@ class Alignment_Model:
                     old_alignments = {tuple(align.tokens): align for align in alignments[amr.id]}
                     readable = [(all_scores[(n,span)],
                                  list(span), n,
-                                self.get_alignment_label(amr, candidate_aligns[(n,span)]),
                                  ' '.join(amr.lemmas[t] for t in span),
+                                 self.get_alignment_label(amr, candidate_aligns[(n,span)]),
                                  self.readable_logp(amr, alignments, candidate_aligns[(n,span)]),
                                  self.readable_logp(amr, alignments, old_alignments[span]) if span in old_alignments else None,
                                  ) for n,span in all_scores.keys()]
