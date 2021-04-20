@@ -75,6 +75,8 @@ def main():
                 if not row[3]:
                     raise Exception('Missing Annotation:', amr_id)
                 node_id = row[1]
+                if node_id not in node_labels:
+                    raise Exception('Failed to parse node labels:', amr.id, node_id)
                 n = node_labels[node_id]
                 token_ids = [int(t) for t in row[3].split(',')]
                 if any(t>=len(amr.tokens) for t in token_ids):
@@ -96,6 +98,8 @@ def main():
                 if not row[3]:
                     raise Exception('Missing Annotation:', amr_id)
                 edge_id = row[1]
+                if edge_id not in edge_labels:
+                    raise Exception('Failed to parse edge labels:', amr.id, node_id)
                 e = edge_labels[edge_id]
                 token_ids = [int(t) for t in row[3].split(',')]
                 if any(t>=len(amr.tokens) for t in token_ids):
@@ -149,6 +153,8 @@ def main():
             subgraph_aligns = [a for a in subgraph_alignments[amr.id] if a.tokens==align.tokens]
             for s,r,t in align.edges:
                 if subgraph_aligns and not any(s in a.nodes or t in a.nodes or not a.nodes for a in subgraph_aligns):
+                    if r==':manner' and amr.tokens[align.tokens[0]]=='without':
+                        continue
                     raise Exception('Bad Relation align:', amr.id, align.tokens, s, r, t)
         dupl_sub_aligns = [align for align in subgraph_alignments[amr_id] if align.type.startswith('dupl')]
         subgraph_alignments[amr_id] = [align for align in subgraph_alignments[amr_id] if not align.type.startswith('dupl')]
