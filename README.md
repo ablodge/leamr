@@ -37,7 +37,7 @@ The package includes tools for converting AMR alignments from and to JSON like t
 ```
 
 The advantages of using JSON are:
-- Easy to load and save (No need to write a special script for reading some esoteric format)
+- Easy to load and save (No need to write a special script for reading some esoteric format, c.f. JAMR, ISI alignments)
 - Can store additional information in a `type` to distinguish different types of alignments
 - Can easily store multiple sets of alignments separately, without needing to modify an AMR file. That makes it easy to compare different sets of alignments. 
 
