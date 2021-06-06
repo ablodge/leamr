@@ -22,3 +22,17 @@ Little Prince [https://amr.isi.edu/download.html](https://amr.isi.edu/download.h
 
 
 ## Train Aligner
+
+
+
+### Cite
+```
+@inproceedings{blodgett2021,
+    title = "Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of {AMR} Alignments",
+    author = "Blodgett, Austin  and
+      Schneider, Nathan",
+    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics",
+    month = aug,
+    year = 2021
+}
+```
