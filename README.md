@@ -1,4 +1,6 @@
-# LEAMR (Linguistically Enriched AMR) Alignments
+# LEAMR 
+
+LEAMR (Linguistically Enriched AMR) Alignments
 A release of models and data related to alignments between AMR and English text for better parsing and probing of many different linguistic phenomena.
 
 Also see the [AMR-utils](https://github.com/ablodge/amr-utils) library.
