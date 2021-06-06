@@ -14,7 +14,8 @@ A release of models and data related to alignments between AMR and English text 
 
 
 ## Get Alignments
-
+AMR Release 3.0 [https://catalog.ldc.upenn.edu/LDC2020T02](https://catalog.ldc.upenn.edu/LDC2020T02)
+Little Prince [https://amr.isi.edu/download.html](https://amr.isi.edu/download.html)
 
 ## Run Pre-trained Aligner
 
