@@ -3,7 +3,7 @@ import sys
 from amr_utils.amr_readers import AMR_Reader
 
 from display import Alignment_Display
-from evaluate.utils import evaluate, perplexity
+from evaluate.utils import evaluate, perplexity, evaluate_duplicates
 from models.subgraph_model import Subgraph_Model
 from nlp_data import add_nlp_data
 
@@ -49,7 +49,7 @@ def main():
 
     align_model = Subgraph_Model(amrs, align_duplicates=True)
 
-    iters = 10
+    iters = 1
 
     alignments = None
     eval_alignments = None
@@ -69,8 +69,9 @@ def main():
             perplexity(align_model, eval_amrs, eval_alignments)
             postprocess_alignments(amrs, alignments)
             evaluate(eval_amrs, eval_alignments, gold_dev_alignments)
+            evaluate_duplicates(eval_amrs, eval_alignments, gold_dev_alignments)
+            report_progress(eval_amrs, eval_amr_file, eval_alignments, reader, epoch=i)
             print()
-
 
     report_progress(amrs, amr_file, alignments, reader)
 

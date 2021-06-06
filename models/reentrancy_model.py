@@ -285,7 +285,7 @@ class Reentrancy_Model(Alignment_Model):
                     # comparative
                     parent = amr.nodes[e[0]]
                     if parent == 'have-degree-91':
-                        span_types.append('comparative')
+                        span_types.append('comparative control')
                     # adjunct2
                     if pos=='VBG':
                         rel_align = amr.get_alignment(self.relation_alignments, edge=e)

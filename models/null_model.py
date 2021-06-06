@@ -58,11 +58,3 @@ class Null_Model:
             p = 1 / math.sqrt(rank)
             total += p*self.tokens_count[tok]
         return total
-
-    def inductive_bias(self, amr, token_label, token_idx):
-        token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
-        joint_logp = self.logp(amr, token_label, token_idx) + token_logp
-        logp = joint_logp - self.null_logp
-        if logp>0:
-            raise Exception('Improper Log Probability:',logp)
-        return logp

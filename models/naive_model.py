@@ -117,25 +117,6 @@ class Node_Model:
                                 f'{self.translation_count[token_label][n_label]}/{self.tokens_count[token_label]}', node_logps[l])
         return node_logps
 
-    def inductive_bias(self, amr, align):
-        if not align: return {}
-        token_label = self.tokens_label(amr, align.tokens)
-        node_logps = {}
-        for n in align.nodes:
-            n_label = self.concept_label(amr, n)
-            node_logp = self.concept_token_logp(n_label, token_label) - self.concept_logp(n_label)
-            l = n_label
-            i = 1
-            while l in node_logps:
-                i += 1
-                l = f'{n_label}#{i}'
-            l = f'{l} : {token_label}'
-            node_logps[l] = node_logp
-            if node_logps[l]>0:
-                raise Exception('Improper Probability', token_label, l,
-                                f'{self.translation_count[token_label][n_label]}/{self.concept_count[n_label]}', node_logps[l])
-        return node_logps
-
 
 class Internal_Edge_Model:
 
@@ -277,27 +258,6 @@ class Internal_Edge_Model:
                                 f'{self.translation_count[token_label][e_label]}/{self.tokens_count[token_label]}', edge_logps[l])
         return edge_logps
 
-    def inductive_bias(self, amr, align):
-        if len(align.nodes)<=1:
-            return {}
-        token_label = self.tokens_label(amr, align.tokens)
-        edge_logps = {}
-        edges = [(s, r, t) for s, r, t in amr.edges if s in align.nodes and t in align.nodes]
-        for s, r, t in edges:
-            e_label = self.edge_label(amr, (s, r, t))
-            edge_logp = self.edge_token_logp(e_label, token_label) - self.edge_logp(e_label)
-            l = e_label
-            i = 1
-            while l in edge_logps:
-                i += 1
-                l = f'{e_label}#{i}'
-            l = f'{l} : {token_label}'
-            edge_logps[l] = edge_logp
-            if edge_logps[l]>0:
-                raise Exception('Improper Probability', token_label, l,
-                                f'{self.translation_count[token_label][e_label]}/{self.edge_count[e_label]}', edge_logps[l])
-        return edge_logps
-
 
 class External_Edge_Model(Internal_Edge_Model):
 
@@ -326,54 +286,4 @@ class External_Edge_Model(Internal_Edge_Model):
         return edge_logps
 
 
-class POS_Node_Model(Node_Model):
-
-    def __init__(self, amrs, alpha):
-        self.null_count = Counter()
-        self.null_total = 0
-        super().__init__(amrs, alpha)
-
-    def tokens_label(self, amr, span):
-        return amr.pos[span[0]]
-
-    def init_params(self, amrs):
-        self.tokens_count = defaultdict(lambda: 0.)
-        self.concept_count = defaultdict(lambda: 0.)
-        for amr in amrs:
-            tokens = [self.tokens_label(amr, span) for span in amr.spans]
-            nodes = [self.concept_label(amr, n) for n in amr.nodes]
-            for tok in tokens:
-                self.tokens_count[tok] += 1
-            for node in nodes:
-                self.concept_count[node] += 1
-        self.concept_total = sum(self.concept_count.values())
-        self.tokens_total = sum(self.tokens_count.values())
-        for tok in self.tokens_count:
-            self.translation_count[tok] = defaultdict(lambda:0)
-            for concept in self.concept_count:
-                self.translation_count[tok][concept] = self.concept_count[concept]/len(self.tokens_count)
-        self.translation_total = self.concept_total
-        for t in self.tokens_count:
-            self.null_count[t] = 1
-        self.null_total = len(self.tokens_count)
-
-    def update_parameters(self, amrs, alignments):
-        super().update_parameters(amrs, alignments)
-        self.null_count = Counter()
-        self.null_total = 0
-        for amr in amrs:
-            for align in alignments[amr.id]:
-                if not align.nodes:
-                    self.null_total += 1
-                    pos = self.tokens_label(amr, align.tokens)
-                    self.null_count[pos] += 1
-        self.null_total += self.alpha*(len(self.tokens_count)+1)
-
-    def inductive_bias(self, amr, align):
-        parts = super().inductive_bias(amr, align)
-        if not align.nodes:
-            token_label = self.tokens_label(amr, align.tokens)
-            alpha = 0 if self.first_iter else self.alpha
-            parts[f'<null> : {token_label}'] = math.log(self.null_count[token_label] + alpha) - math.log(self.null_total)
-        return parts
 
