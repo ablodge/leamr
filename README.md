@@ -11,3 +11,12 @@ A release of models and data related to alignments between AMR and English text 
 	- `<corpus>.entity_attributes.json`: AMR attributes and token spans for dates named entities and so on
 	- `<corpus>.coref_alignments.json`: alignments of reentrancy edges to spans cueing coreference, such as pronouns or repeated named entity names.
 	- `<corpus>.control_alignments.json`: alignments of reentrancy edges to spans cueing control, such as control verbs or purpose clauses.
+
+
+## Get Alignments
+
+
+## Run Pre-trained Aligner
+
+
+## Train Aligner
