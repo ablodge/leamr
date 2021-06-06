@@ -1,22 +1,35 @@
 import math
 
-from models.base_model import Alignment_Model
-
 
 class Null_Model:
 
-    def __init__(self, align_model:Alignment_Model):
+    def __init__(self, tokens_count, tokens_total, alpha):
 
-        self.alpha = align_model.alpha
-        self.tokens_count = align_model.tokens_count
-        self.tokens_total = align_model.tokens_total
+        self.alpha = alpha
+        self.tokens_count = tokens_count
+        self.tokens_total = tokens_total
         self.tokens_rank = {t: i + 1 for i, t in enumerate(sorted(self.tokens_count, key=lambda x: self.tokens_count[x], reverse=True))}
 
-    def logp(self, amr, token_label, token_idx):
+        self.null_logp = 0
+        for token_label in self.tokens_count:
+            token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
+            logp = self.rank_logp(token_label)
+            p = math.exp(logp+token_logp)
+            self.null_logp += p
+        self.null_logp = math.log(self.null_logp)
+
+    def rank_logp(self, token_label):
         if token_label in self.tokens_rank:
             rank = self.tokens_rank[token_label]
         else:
             rank = len(self.tokens_rank)
+        p = 1 / (rank)
+        logp = 0.5 * math.log(p)
+        return logp
+
+    def logp(self, amr, token_label, token_idx):
+        logp = max(self.rank_logp(token_label), math.log(0.01))
+
         # punctuation
         if not token_label[0].isalpha() and not token_label[0].isdigit():
             return math.log(0.5)
@@ -31,9 +44,6 @@ class Null_Model:
             for start, end in zip(start_parens, end_parens):
                 if start <= token_idx <= end:
                     return math.log(0.5)
-        p = 1 / (rank)
-        logp = 0.5 * math.log(p)
-        logp = max(logp, math.log(0.01))
 
         # repetition
         for span in amr.spans:
@@ -48,6 +58,3 @@ class Null_Model:
             p = 1 / math.sqrt(rank)
             total += p*self.tokens_count[tok]
         return total
-
-    def inductive_bias(self, token_label):
-        return 0.0

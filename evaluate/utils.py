@@ -4,6 +4,23 @@ import sys
 from amr_utils.alignments import AMR_Alignment
 
 
+def table_to_latex(table, row_labels, column_labels):
+    sep = ' & '
+    end = ' \\\\'
+    latex = sep.join(column_labels)+end+'\n'
+    for row_label, row in zip(row_labels, table):
+        latex += row_label+sep+sep.join(f'{t:.2f}' if isinstance(t, float) else str(t) for t in row)+end+'\n'
+    return latex
+
+def table_to_excel(table, row_labels, column_labels):
+    sep = '\t'
+    end = ''
+    s = sep.join(column_labels)+end+'\n'
+    for row_label, row in zip(row_labels, table):
+        s += row_label+sep+sep.join(f'{t:.2f}' if isinstance(t, float) else str(t) for t in row)+end+'\n'
+    return s
+
+
 def coverage(amrs, alignments, mode='nodes'):
     coverage_count = 0
     total = 0

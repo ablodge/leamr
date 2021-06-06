@@ -2,7 +2,7 @@ import sys
 
 from amr_utils.amr_readers import AMR_Reader
 
-from display import Display
+from display import Alignment_Display
 from evaluate.utils import perplexity, evaluate_reentrancies
 from models.reentrancy_model import Reentrancy_Model
 from nlp_data import add_nlp_data
@@ -10,7 +10,7 @@ from nlp_data import add_nlp_data
 
 def report_progress(amrs, amr_file, alignments, reader,  epoch=None):
     epoch = '' if epoch is None else f'.epoch{epoch}'
-    Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.reentrancy_alignments{epoch}.html')
+    Alignment_Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.reentrancy_alignments{epoch}.html', alignments)
 
     align_file = amr_file.replace('.txt', '') + f'.reentrancy_alignments{epoch}.json'
     print(f'Writing reentrancy alignments to: {align_file}')
@@ -66,7 +66,7 @@ def main():
 
     align_model = Reentrancy_Model(amrs, subgraph_alignments, relation_alignments)
 
-    iters = 3
+    iters = 5
 
     alignments = None
     eval_alignments = None
@@ -85,6 +85,7 @@ def main():
             if gold_eval_alignments is not None:
                 # evaluate_relations(eval_amrs, eval_alignments, gold_eval_alignments, pred_subgraph_alignments, gold_subgraph_alignments)
                 evaluate_reentrancies(eval_amrs, eval_alignments, gold_eval_alignments)
+                report_progress(eval_amrs, eval_amr_file, eval_alignments, reader, epoch=i)
             print()
 
     report_progress(amrs, amr_file, alignments, reader)

@@ -1,0 +1,6 @@
+spacy==2.3.5
+stanza==1.2
+tqdm==4.61.0
+neuralcoref==4.0
+penman==1.2.0
+scipy==1.5.2
