@@ -56,6 +56,12 @@ reader.save_alignments_to_json(alignments_file, alignments)
 AMR Release 3.0 [https://catalog.ldc.upenn.edu/LDC2020T02](https://catalog.ldc.upenn.edu/LDC2020T02)
 Little Prince [https://amr.isi.edu/download.html](https://amr.isi.edu/download.html)
 
+
+```
+wget https://amr.isi.edu/download/amr-bank-struct-v1.6.txt -o data-release/little_prince.txt
+python build_data.py <LDC parent dir>
+```
+
 # Run Pre-trained Aligner
 
 
