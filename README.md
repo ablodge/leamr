@@ -58,7 +58,7 @@ Little Prince [https://amr.isi.edu/download.html](https://amr.isi.edu/download.h
 
 
 ```
-wget https://amr.isi.edu/download/amr-bank-struct-v1.6.txt -O data-release/little_prince.txt
+wget https://amr.isi.edu/download/amr-bank-struct-v1.6.txt -O data-release/amrs/little_prince.txt
 python build_data.py <LDC parent dir>
 ```
 
