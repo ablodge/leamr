@@ -23,13 +23,21 @@ Also `<corpus>.spans.json`: spans for each sentence, grouping tokens which are e
 
 ## Subgraph Alignments
 
-### Duplicate Subgraph Alignments
+span to subgraph, named entities, mwes
+
+## Duplicate Subgraph Alignments
+
+ellipsis
 
 ## Relation Alignments
 
+arg structures
+
+single rel
+
 ## Reentrancy Alignments and Classes
 
-
+examples coref, coordination, control
 
 
 
