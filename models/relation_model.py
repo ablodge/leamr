@@ -292,3 +292,14 @@ class Relation_Model(Alignment_Model):
 
         # readable = [r for r in sorted(readable, key=lambda x:x['score'], reverse=True)]
         return best_align, best_score
+
+
+    def align_all(self, amrs, alignments=None, preprocess=True, debug=False):
+        alignments = super().align_all(amrs, alignments, preprocess, debug)
+
+        for amr in amrs:
+            for align in alignments[amr.id]:
+                for sub_align in self.subgraph_alignments[amr.id]:
+                    if any(e[0] in sub_align.nodes and e[-1] in sub_align.nodes for e in align.edges):
+                        align.edges = [e for e in align.edges if not (e[0] in sub_align.nodes and e[-1] in sub_align.nodes)]
+        return alignments

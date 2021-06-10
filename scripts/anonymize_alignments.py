@@ -9,7 +9,7 @@ def main():
     output_file = sys.argv[2]
 
     reader = AMR_Reader()
-    amrs = reader.load(amr_file)
+    amrs = reader.load(amr_file, remove_wiki=True)
 
     # subgraphs
     align_file = amr_file.replace('.txt','')+'.subgraph_alignments.json'
