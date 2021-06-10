@@ -10,7 +10,11 @@ Austin Blodgett and Nathan Schneider. 2021. Probabilistic, Structure-Aware Algor
 Also see [AMR-utils](https://github.com/ablodge/amr-utils) and the [AMR Bibliography](https://nert-nlp.github.io/AMR-Bibliography/).
 
 
+# Install
 
+```
+pip install requirements.txt
+```
 
 # Data
 
@@ -39,15 +43,20 @@ reader = AMR_Reader()
 alignments = reader.load_alignments_from_json(alignments_file)
 ```
 
-# Get Alignments
-Anonymized alignments are stored in the folder `data-release/alignments`. To get the AMR and 
+
+## Get Alignments
+Anonymized alignments are stored in the folder `data-release/alignments`. To interpret them, you will need the associted AMR data.
+
+
+## Get AMR Data
+AMR Release 3.0 [https://catalog.ldc.upenn.edu/LDC2020T02](https://catalog.ldc.upenn.edu/LDC2020T02) 
 
 ```
-pip install requirements.txt
 wget https://amr.isi.edu/download/amr-bank-struct-v1.6.txt -O data-release/amrs/little_prince.txt
 python build_data.py <LDC parent dir>
 python unanonymize_alignments.py
 ```
+
 
 # Run Pre-trained Aligner
 ```
