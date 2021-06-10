@@ -24,23 +24,43 @@ Also `<corpus>.spans.json`: spans for each sentence, grouping tokens which are e
 ## Subgraph Alignments
 
 span to subgraph, named entities, mwes
+```
+{"type": "subgraph", "tokens": [7, 8], "nodes": ["1.2.2", "1.2.2.1", "1.2.2.1.1", "1.2.2.1.2"], "edges": [["1.2.2.1", null, "1.2.2.1.1"], ["1.2.2.1", null, "1.2.2.1.2"], ["1.2.2", null, "1.2.2.1"]], "string": "New York => city :name name, name :op1 New, name :op2 York"}
+```
 
 ## Duplicate Subgraph Alignments
 
 ellipsis
 
+```
+{"type": "dupl-subgraph", "tokens": [3], "nodes": ["1.1.2.1","1.1.2.1.1"]}, "edges": [["1.1.2.1",":ARG0-of","1.1.2.1.1"]], "string": "students => person :ARG0-of study-01"}
+```
+
 ## Relation Alignments
 
 arg structures
 
+```
+{"type": "relation", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"], ["1.3", null, "1.3.2"]], "string": "want => :ARG0 :ARG1"}
+```
+
 single rel
+
+```
+{"type": "relation", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "when => :time"}
+```
 
 ## Reentrancy Alignments and Classes
 
 examples coref, coordination, control
 
+```
+{"type": "reentrancy:coref", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "they => ???"}
+```
 
-
+```
+{"type": "reentrancy:control", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "want => ???"}
+```
 
 ## JSON Format
 The package includes tools for converting AMR alignments from and to JSON like the following.
