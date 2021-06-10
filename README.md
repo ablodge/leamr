@@ -25,7 +25,11 @@ Also `<corpus>.spans.json`: spans for each sentence, grouping tokens which are e
 
 span to subgraph, named entities, mwes
 ```
-{"type": "subgraph", "tokens": [7, 8], "nodes": ["1.2.2", "1.2.2.1", "1.2.2.1.1", "1.2.2.1.2"], "edges": [["1.2.2.1", null, "1.2.2.1.1"], ["1.2.2.1", null, "1.2.2.1.2"], ["1.2.2", null, "1.2.2.1"]], "string": "New York => city :name name, name :op1 New, name :op2 York"}
+{"type": "subgraph", "tokens": [3], "nodes": ["1.1", "1.1.1"], "edges": [["1.1", ":ARG0-of", "1.1.1"]], "string": "students => person :ARG0-of study-01"}
+```
+
+```
+{"type": "subgraph", "tokens": [7, 8], "nodes": ["1.2.2", "1.2.2.1", "1.2.2.1.1", "1.2.2.1.2"], "edges": [["1.2.2.1", ":name", "1.2.2.1.1"], ["1.2.2.1", ":op1", "1.2.2.1.2"], ["1.2.2", ":op2", "1.2.2.1"]], "string": "New York => city :name name, name :op1 New, name :op2 York"}
 ```
 
 ## Duplicate Subgraph Alignments
@@ -41,13 +45,13 @@ ellipsis
 arg structures
 
 ```
-{"type": "relation", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"], ["1.3", null, "1.3.2"]], "string": "want => :ARG0 :ARG1"}
+{"type": "relation", "tokens": [4], "nodes": [], "edges": [["1", ":ARG0", "1.1"], ["1", ":ARG1", "1.2"]], "string": "want => want-01 :ARG0 person, want-01 :ARG1 visit-01"}
 ```
 
 single rel
 
 ```
-{"type": "relation", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "when => :time"}
+{"type": "relation", "tokens": [9], "nodes": [], "edges": [["1.2", ":time", "1.2.3"]], "string": "when => visit-01 :time graduate-01"}
 ```
 
 ## Reentrancy Alignments and Classes
@@ -55,11 +59,8 @@ single rel
 examples coref, coordination, control
 
 ```
-{"type": "reentrancy:coref", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "they => ???"}
-```
-
-```
-{"type": "reentrancy:control", "tokens": [0], "nodes": [], "edges": [["1.3.2", null, "1.3.2.1"]], "string": "want => ???"}
+{"type": "reentrancy:coref", "tokens": [10], "edges": [["1.2.3", ":ARG0", "1.1"]], "string": "they => graduate-01 :ARG0 person"}
+{"type": "reentrancy:control", "tokens": [4], "edges": [["1.2", ":ARG0", "1.1"]], "string": "want => visit-01 :ARG0 person"}
 ```
 
 ## JSON Format
