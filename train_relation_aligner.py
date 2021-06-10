@@ -1,61 +1,56 @@
 import sys
 
 from amr_utils.amr_readers import AMR_Reader
-
-from display import Alignment_Display
 from evaluate.utils import perplexity, evaluate_relations
 from models.relation_model import Relation_Model
 from nlp_data import add_nlp_data
 
 
-def report_progress(amrs, amr_file, alignments, subgraph_alignments, reader, epoch=None):
+USE_GOLD_SUBGRAPHS = False
+
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-T','--train', required=True, type=str,
+                    help='train AMR file (must have nlp data, subgraph alignments)')
+parser.add_argument('-t','--test', type=str, nargs=2,
+                    help='2 arguments: test AMR file and gold alignments file (must have nlp data, subgraph alignments)')
+args = parser.parse_args()
+
+def report_progress(amr_file, alignments, reader, epoch=None):
     epoch = '' if epoch is None else f'.epoch{epoch}'
-    single_rel_alignments = {}
-    for amr in amrs:
-        single_rel_alignments[amr.id] = []
-        for align in alignments[amr.id]:
-            sub_align = amr.get_alignment(subgraph_alignments, token_id=align.tokens[0])
-            if not sub_align:
-                single_rel_alignments[amr.id].append(align)
-
-    Alignment_Display.style(amrs[:100], amr_file.replace('.txt', '') + f'.relation_alignments{epoch}.html', single_rel_alignments)
-
     align_file = amr_file.replace('.txt', '') + f'.relation_alignments{epoch}.json'
     print(f'Writing relation alignments to: {align_file}')
     reader.save_alignments_to_json(align_file, alignments)
 
 
-def get_eval_data(reader):
-    if len(sys.argv) > 2:
-        eval_amr_file = sys.argv[2]
-        eval_amrs = reader.load(eval_amr_file, remove_wiki=True)
-        add_nlp_data(eval_amrs, eval_amr_file)
-        gold_eval_alignments = reader.load_alignments_from_json(sys.argv[3], eval_amrs) if len(sys.argv)>3 else None
-        return eval_amr_file, eval_amrs, gold_eval_alignments
-    return None, None, None
-
-
 def main():
-    amr_file = sys.argv[1]
+    amr_file = args.train
 
     reader = AMR_Reader()
     amrs = reader.load(amr_file, remove_wiki=True)
     add_nlp_data(amrs, amr_file)
 
-    eval_amr_file, eval_amrs, gold_eval_alignments = get_eval_data(reader)
-    eval_amr_ids = {amr.id for amr in eval_amrs}
-    amrs = [amr for amr in amrs if amr.id not in eval_amr_ids]
-    # amrs = amrs[:1000]
-
     align_file = amr_file.replace('.txt', '') + '.subgraph_alignments.json'
     subgraph_alignments = reader.load_alignments_from_json(align_file, amrs)
+    # amrs = amrs[:1000]
 
-    if gold_eval_alignments is not None:
+    eval_amr_file, eval_amrs, gold_eval_alignments = None, None, None
+    if args.test:
+        eval_amr_file, eval_align_file = args.test
+        eval_amrs = reader.load(eval_amr_file, remove_wiki=True)
+        add_nlp_data(eval_amrs, eval_amr_file)
+        gold_eval_alignments = reader.load_alignments_from_json(eval_align_file, eval_amrs)
+        eval_amr_ids = {amr.id for amr in eval_amrs}
+        amrs = [amr for amr in amrs if amr.id not in eval_amr_ids]
+
         align_file = eval_amr_file.replace('.txt', '') + '.subgraph_alignments.gold.json'
         gold_subgraph_alignments = reader.load_alignments_from_json(align_file, eval_amrs)
         align_file = eval_amr_file.replace('.txt', '') + '.subgraph_alignments.json'
         pred_subgraph_alignments = reader.load_alignments_from_json(align_file, eval_amrs)
-        # pred_subgraph_alignments = gold_subgraph_alignments
+        if USE_GOLD_SUBGRAPHS:
+            pred_subgraph_alignments = gold_subgraph_alignments
         for amr_id in pred_subgraph_alignments:
             subgraph_alignments[amr_id] = pred_subgraph_alignments[amr_id]
         for amr in eval_amrs:
@@ -66,14 +61,11 @@ def main():
 
     iters = 5
 
-    alignments = None
-    eval_alignments = None
-
     for i in range(iters):
         print(f'Epoch {i}: Training data')
         alignments = align_model.align_all(amrs)
         align_model.update_parameters(amrs, alignments)
-        report_progress(amrs, amr_file, alignments, subgraph_alignments, reader, epoch=i)
+        report_progress(amr_file, alignments, reader, epoch=i)
         perplexity(align_model, amrs, alignments)
         print()
 
@@ -81,17 +73,9 @@ def main():
             print(f'Epoch {i}: Evaluation data')
             eval_alignments = align_model.align_all(eval_amrs)
             perplexity(align_model, eval_amrs, eval_alignments)
-            if gold_eval_alignments is not None:
-                evaluate_relations(eval_amrs, eval_alignments, gold_eval_alignments, pred_subgraph_alignments, gold_subgraph_alignments)
-                # evaluate(eval_amrs, eval_alignments, gold_eval_alignments, mode='edges')
-                report_progress(eval_amrs, eval_amr_file, eval_alignments, subgraph_alignments, reader, epoch=i)
+            evaluate_relations(eval_amrs, eval_alignments, gold_eval_alignments, pred_subgraph_alignments, gold_subgraph_alignments)
+            report_progress(eval_amr_file, eval_alignments, reader, epoch=i)
             print()
-
-    report_progress(amrs, amr_file, alignments, subgraph_alignments, reader)
-
-    if eval_amrs:
-        report_progress(eval_amrs, eval_amr_file, eval_alignments, subgraph_alignments, reader)
-
 
 if __name__ == '__main__':
     main()

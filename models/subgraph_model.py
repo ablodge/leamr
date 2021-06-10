@@ -377,3 +377,16 @@ class Subgraph_Model(Alignment_Model):
         )
         return readable
 
+    def align_all(self, amrs, alignments=None, preprocess=True, debug=False):
+        alignments = super().align_all(amrs, alignments, preprocess, debug)
+
+        for amr in amrs:
+            for align in alignments[amr.id]:
+                if len(align.nodes) > 1:
+                    for e in amr.edges:
+                        s,r,t = e
+                        if s in align.nodes and t in align.nodes and e not in align.edges:
+                            align.edges.append(e)
+
+        return alignments
+

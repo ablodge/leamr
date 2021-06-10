@@ -135,6 +135,10 @@ class Relation_Model(Alignment_Model):
 
     def get_unaligned(self, amr, alignments):
         unaligned = set(amr.edges)
+        for align in self.subgraph_alignments[amr.id]:
+            for e in align.edges:
+                if e in unaligned:
+                    unaligned.remove(e)
         for align in alignments[amr.id]:
             # if align.type!='relation': continue
             for e in align.edges:

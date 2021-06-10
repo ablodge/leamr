@@ -1,0 +1,389 @@
+# ::id AUSTINS_EXAMPLE
+# ::tok Most of the students want to visit New York when they graduate .
+# ::node	1	want-01
+# ::node	1.1	person
+# ::node	1.1.1	study-01
+# ::node	1.1.2	include-91
+# ::node	1.1.2.1	person
+# ::node	1.1.2.1.1	study-01
+# ::node	1.1.2.2	most
+# ::node	1.2	visit-01
+# ::node	1.2.2	city
+# ::node	1.2.2.1	name
+# ::node	1.2.3	graduate-01
+# ::node	1.2.2.1.1	"New"
+# ::node	1.2.2.1.2	"York"
+# ::root	1	want-01
+# ::edge	name	op1	"New"	1.2.2.1	1.2.2.1.1
+# ::edge	name	op2	"York"	1.2.2.1	1.2.2.1.2
+# ::edge	want-01	ARG0	person	1	1.1
+# ::edge	person	ARG0-of	study-01	1.1	1.1.1
+# ::edge	person	ARG1-of	include-91	1.1	1.1.2
+# ::edge	include-91	ARG2	person	1.1.2	1.1.2.1
+# ::edge	person	ARG0-of	study-01	1.1.2.1	1.1.2.1.1
+# ::edge	include-91	ARG3	most	1.1.2	1.1.2.2
+# ::edge	want-01	ARG1	visit-01	1	1.2
+# ::edge	visit-01	ARG0	person	1.2	1.1
+# ::edge	visit-01	ARG1	city	1.2	1.2.2
+# ::edge	city	name	name	1.2.2	1.2.2.1
+# ::edge	visit-01	time	graduate-01	1.2	1.2.3
+# ::edge	graduate-01	ARG0	person	1.2.3	1.1
+(w/want-01
+	:ARG0 (p/person
+		:ARG0-of (s/study-01)
+		:ARG1-of (i/include-91
+			:ARG2 (p2/person
+				:ARG0-of (s2/study-01))
+			:ARG3 (m/most)))
+	:ARG1 (v/visit-01
+		:ARG0 p
+		:ARG1 (c/city
+			:name (n/name
+				:op1 "New"
+				:op2 "York"))
+		:time (g/graduate-01
+			:ARG0 p)))
+
+# ::id NATHANS_EXAMPLE
+# ::tok In the story, evildoer Cruella de Vil makes no attempt to conceal her glee and lack of conscience.
+# ::node	1	attempt-01
+# ::node	1.1	-
+# ::node	1.2	story
+# ::node	1.3	person
+# ::node	1.3.1	do-02
+# ::node	1.3.1.1	thing
+# ::node	1.3.1.1.1	evil
+# ::node	1.3.2	name
+# ::node	1.3.2.1	"Cruella"
+# ::node	1.3.2.2	"de"
+# ::node	1.3.2.3	"Vil"
+# ::node	1.4	conceal-01
+# ::node	1.4.2	and
+# ::node	1.4.2.1	glee
+# ::node	1.4.2.2	lack-01
+# ::node	1.4.2.2.2	conscience
+# ::root	1	attempt-01
+# ::edge	attempt-01	polarity	-	1	1.1
+# ::edge	attempt-01	location	story	1	1.2
+# ::edge	attempt-01	ARG0	person	1	1.3
+# ::edge	person	ARG0-of	do-02	1.3	1.3.1
+# ::edge	do-02	ARG1	thing	1.3.1	1.3.1.1
+# ::edge	thing	mod	evil	1.3.1.1	1.3.1.1.1
+# ::edge	person	name	name	1.3	1.3.2
+# ::edge	name	op1	"Cruella"	1.3.2	1.3.2.1
+# ::edge	name	op2	"de"	1.3.2	1.3.2.2
+# ::edge	name	op3	"Vil"	1.3.2	1.3.2.3
+# ::edge	attempt-01	ARG1	conceal-01	1	1.4
+# ::edge	conceal-01	ARG0	person	1.4	1.3
+# ::edge	conceal-01	ARG1	and	1.4	1.4.2
+# ::edge	and	op1	glee	1.4.2	1.4.2.1
+# ::edge	glee	poss	person	1.4.2.1	1.3
+# ::edge	and	op2	lack-01	1.4.2	1.4.2.2
+# ::edge	lack-01	ARG0	person	1.4.2.2	1.3
+# ::edge	lack-01	ARG1	conscience	1.4.2.2	1.4.2.2.2
+(a/attempt-01
+	:ARG0 (p/person
+		:ARG0-of (d/do-02
+			:ARG1 (t/thing
+				:mod (e/evil)))
+		:name (n/name
+			:op1 "Cruella"
+			:op2 "de"
+			:op3 "Vil"))
+	:ARG1 (c/conceal-01
+		:ARG0 p
+		:ARG1 (a2/and
+			:op1 (g/glee
+				:poss p)
+			:op2 (l/lack-01
+				:ARG0 p
+				:ARG1 (c2/conscience))))
+	:location (s/story)
+	:polarity -)
+
+# ::id edinburgh_1003.1
+# ::tok that's a terribly small horse for you to ride .
+# ::node	1	small
+# ::node	1.1	terribly
+# ::node	1.2	horse
+# ::node	1.2.1	that
+# ::node	1.3	ride-01
+# ::node	1.3.1	you
+# ::root	1	small
+# ::edge	small	degree	terribly	1	1.1
+# ::edge	small	domain	horse	1	1.2
+# ::edge	horse	mod	that	1.2	1.2.1
+# ::edge	small	beneficiary	ride-01	1	1.3
+# ::edge	ride-01	ARG0	you	1.3	1.3.1
+# ::edge	ride-01	ARG1	horse	1.3	1.2
+(s/small
+	:beneficiary (r/ride-01
+		:ARG0 (y/you)
+		:ARG1 h)
+	:degree (t/terribly)
+	:domain (h/horse
+		:mod (t2/that)))
+
+# ::id edinburgh_1003.2
+# ::tok why don't you look at some of the toys in the basket .
+# ::node	1	recommend-01
+# ::node	1.1	look-01
+# ::node	1.1.2	toy
+# ::node	1.1.2.1	some
+# ::node	1.1.2.2	basket
+# ::node	1.2	you
+# ::root	1	recommend-01
+# ::edge	recommend-01	ARG1	look-01	1	1.1
+# ::edge	look-01	ARG0	you	1.1	1.2
+# ::edge	look-01	ARG1	toy	1.1	1.1.2
+# ::edge	toy	mod	some	1.1.2	1.1.2.1
+# ::edge	toy	location	basket	1.1.2	1.1.2.2
+# ::edge	recommend-01	ARG2	you	1	1.2
+(r/recommend-01
+	:ARG1 (l/look-01
+		:ARG0 y
+		:ARG1 (t/toy
+			:location (b/basket)
+			:mod (s/some)))
+	:ARG2 (y/you))
+
+# ::id edinburgh_1003.3
+# ::tok does he walk like you or does he go hop hop hop ?
+# ::node	1	multiple-choice-91
+# ::node	1.1	walk-01
+# ::node	1.1.1	he
+# ::node	1.1.2	resemble-01
+# ::node	1.1.2.1	walk-01
+# ::node	1.1.2.1.1	you
+# ::node	1.2	go-05
+# ::node	1.2.2	hop-01
+# ::node	1.2.2.1	expressive
+# ::root	1	multiple-choice-91
+# ::edge	multiple-choice-91	ARG1	walk-01	1	1.1
+# ::edge	walk-01	ARG0	he	1.1	1.1.1
+# ::edge	walk-01	ARG1-of	resemble-01	1.1	1.1.2
+# ::edge	resemble-01	ARG2	walk-01	1.1.2	1.1.2.1
+# ::edge	walk-01	ARG0	you	1.1.2.1	1.1.2.1.1
+# ::edge	multiple-choice-91	ARG2	go-05	1	1.2
+# ::edge	go-05	ARG0	he	1.2	1.1.1
+# ::edge	go-05	ARG1	hop-01	1.2	1.2.2
+# ::edge	hop-01	mode	expressive	1.2.2	1.2.2.1
+(m/multiple-choice-91
+	:ARG1 (w/walk-01
+		:ARG0 (h/he)
+		:ARG1-of (r/resemble-01
+			:ARG2 (w2/walk-01
+				:ARG0 (y/you))))
+	:ARG2 (g/go-05
+		:ARG0 h
+		:ARG1 (h2/hop-01
+			:mode expressive)))
+
+# ::id edinburgh_1003.4
+# ::tok if you look out the other window maybe you'll see it .
+# ::node	1	possible-01
+# ::node	1.1	see-01
+# ::node	1.1.1	you
+# ::node	1.1.2	it
+# ::node	1.2	look-01
+# ::node	1.2.2	out
+# ::node	1.2.2.1	window
+# ::node	1.2.2.1.1	other
+# ::root	1	possible-01
+# ::edge	possible-01	ARG1	see-01	1	1.1
+# ::edge	see-01	ARG0	you	1.1	1.1.1
+# ::edge	see-01	ARG1	it	1.1	1.1.2
+# ::edge	possible-01	condition	look-01	1	1.2
+# ::edge	look-01	ARG0	you	1.2	1.1.1
+# ::edge	look-01	direction	out	1.2	1.2.2
+# ::edge	out	op1	window	1.2.2	1.2.2.1
+# ::edge	window	mod	other	1.2.2.1	1.2.2.1.1
+(p/possible-01
+	:ARG1 (s/see-01
+		:ARG0 (y/you)
+		:ARG1 (i/it))
+	:condition (l/look-01
+		:ARG0 y
+		:direction (o/out
+			:op1 (w/window
+				:mod (o2/other)))))
+
+# ::id edinburgh_1003.5
+# ::tok I think that one's too large to go in the window .
+# ::node	1	think-01
+# ::node	1.1	i
+# ::node	1.2	have-degree-91
+# ::node	1.2.1	large
+# ::node	1.2.2	one
+# ::node	1.2.2.1	that
+# ::node	1.2.3	too
+# ::node	1.2.4	go-01
+# ::node	1.2.4.2	window
+# ::root	1	think-01
+# ::edge	think-01	ARG0	i	1	1.1
+# ::edge	think-01	ARG1	have-degree-91	1	1.2
+# ::edge	have-degree-91	ARG1	large	1.2	1.2.1
+# ::edge	have-degree-91	ARG2	one	1.2	1.2.2
+# ::edge	one	mod	that	1.2.2	1.2.2.1
+# ::edge	have-degree-91	ARG3	too	1.2	1.2.3
+# ::edge	have-degree-91	ARG5	go-01	1.2	1.2.4
+# ::edge	go-01	ARG1	one	1.2.4	1.2.2
+# ::edge	go-01	ARG4	window	1.2.4	1.2.4.2
+(t/think-01
+	:ARG0 (i/i)
+	:ARG1 (h/have-degree-91
+		:ARG1 (l/large)
+		:ARG2 (o/one
+			:mod (t2/that))
+		:ARG3 (t3/too)
+		:ARG5 (g/go-01
+			:ARG1 o
+			:ARG4 (w/window))))
+
+# ::id edinburgh_1003.6
+# ::tok not the kind you hit but the kind you kick .
+# ::node	1	instead-of-91
+# ::node	1.1	kind-yy
+# ::node	1.1.1	kick-01
+# ::node	1.1.1.1	person
+# ::node	1.2	kind-yy
+# ::node	1.2.1	hit-01
+# ::node	1.2.1.1	person
+# ::root	1	instead-of-91
+# ::edge	instead-of-91	ARG1	kind-yy	1	1.1
+# ::edge	kind-yy	ARG1-of	kick-01	1.1	1.1.1
+# ::edge	kick-01	ARG0	person	1.1.1	1.1.1.1
+# ::edge	instead-of-91	ARG2	kind-yy	1	1.2
+# ::edge	kind-yy	ARG1-of	hit-01	1.2	1.2.1
+# ::edge	hit-01	ARG0	person	1.2.1	1.2.1.1
+(i/instead-of-91
+	:ARG1 (k/kind-yy
+		:ARG1-of (k2/kick-01
+			:ARG0 (p/person)))
+	:ARG2 (k3/kind-yy
+		:ARG1-of (h/hit-01
+			:ARG0 (p2/person))))
+
+# ::id edinburgh_1003.7
+# ::tok why don't you take that over and show it to him .
+# ::node	1	recommend-01
+# ::node	1.1	and
+# ::node	1.1.1	take-01
+# ::node	1.1.1.1	you
+# ::node	1.1.1.2	that
+# ::node	1.1.1.3	over
+# ::node	1.1.2	show-01
+# ::node	1.1.2.3	he
+# ::root	1	recommend-01
+# ::edge	recommend-01	ARG1	and	1	1.1
+# ::edge	and	op1	take-01	1.1	1.1.1
+# ::edge	take-01	ARG0	you	1.1.1	1.1.1.1
+# ::edge	take-01	ARG1	that	1.1.1	1.1.1.2
+# ::edge	take-01	direction	over	1.1.1	1.1.1.3
+# ::edge	and	op2	show-01	1.1	1.1.2
+# ::edge	show-01	ARG0	you	1.1.2	1.1.1.1
+# ::edge	show-01	ARG1	that	1.1.2	1.1.1.2
+# ::edge	show-01	ARG2	he	1.1.2	1.1.2.3
+(r/recommend-01
+	:ARG1 (a/and
+		:op1 (t/take-01
+			:ARG0 (y/you)
+			:ARG1 (t2/that)
+			:direction (o/over))
+		:op2 (s/show-01
+			:ARG0 y
+			:ARG1 t2
+			:ARG2 (h/he))))
+
+# ::id edinburgh_1003.8
+# ::tok I guess Cliffy looks at Bozo at her house .
+# ::node	1	guess-01
+# ::node	1.1	i
+# ::node	1.2	look-01
+# ::node	1.2.1	person
+# ::node	1.2.1.1	name
+# ::node	1.2.1.1.1	"Cliffy"
+# ::node	1.2.2	person
+# ::node	1.2.2.1	name
+# ::node	1.2.2.1.1	"Bozo"
+# ::node	1.2.3	house
+# ::root	1	guess-01
+# ::edge	guess-01	ARG0	i	1	1.1
+# ::edge	guess-01	ARG1	look-01	1	1.2
+# ::edge	look-01	ARG0	person	1.2	1.2.1
+# ::edge	person	name	name	1.2.1	1.2.1.1
+# ::edge	name	op1	"Cliffy"	1.2.1.1	1.2.1.1.1
+# ::edge	look-01	ARG1	person	1.2	1.2.2
+# ::edge	person	name	name	1.2.2	1.2.2.1
+# ::edge	name	op1	"Bozo"	1.2.2.1	1.2.2.1.1
+# ::edge	look-01	location	house	1.2	1.2.3
+# ::edge	house	poss	person	1.2.3	1.2.2
+(g/guess-01
+	:ARG0 (i/i)
+	:ARG1 (l/look-01
+		:ARG0 (p/person
+			:name (n/name
+				:op1 "Cliffy"))
+		:ARG1 (p2/person
+			:name (n2/name
+				:op1 "Bozo"))
+		:location (h/house
+			:poss p2)))
+
+# ::id edinburgh_1003.9
+# ::tok you don't have anything else to put in the box do you ?
+# ::node	1	have-03
+# ::node	1.1	-
+# ::node	1.2	you
+# ::node	1.3	anything
+# ::node	1.3.1	else
+# ::node	1.3.2	put-01
+# ::node	1.3.2.2	box
+# ::node	1.4	request-confirmation-91
+# ::root	1	have-03
+# ::edge	have-03	polarity	-	1	1.1
+# ::edge	have-03	ARG0	you	1	1.2
+# ::edge	have-03	ARG1	anything	1	1.3
+# ::edge	anything	mod	else	1.3	1.3.1
+# ::edge	anything	purpose	put-01	1.3	1.3.2
+# ::edge	put-01	ARG1	anything	1.3.2	1.3
+# ::edge	put-01	ARG2	box	1.3.2	1.3.2.2
+# ::edge	have-03	ARG1-of	request-confirmation-91	1	1.4
+(h/have-03
+	:ARG0 (y/you)
+	:ARG1 (a/anything
+		:mod (e/else)
+		:purpose (p/put-01
+			:ARG1 a
+			:ARG2 (b/box)))
+	:ARG1-of (r/request-confirmation-91)
+	:polarity -)
+
+# ::id edinburgh_1003.10
+# ::tok why don't you come over here and play with the ball ?
+# ::node	1	recommend-01
+# ::node	1.1	and
+# ::node	1.1.1	come-01
+# ::node	1.1.1.2	here
+# ::node	1.1.1.3	over
+# ::node	1.1.2	play-01
+# ::node	1.1.2.1	ball
+# ::node	1.2	you
+# ::root	1	recommend-01
+# ::edge	recommend-01	ARG1	and	1	1.1
+# ::edge	and	op1	come-01	1.1	1.1.1
+# ::edge	come-01	ARG1	you	1.1.1	1.2
+# ::edge	come-01	ARG4	here	1.1.1	1.1.1.2
+# ::edge	come-01	direction	over	1.1.1	1.1.1.3
+# ::edge	and	op2	play-01	1.1	1.1.2
+# ::edge	play-01	ARG2	ball	1.1.2	1.1.2.1
+# ::edge	recommend-01	ARG2	you	1	1.2
+(r/recommend-01
+	:ARG1 (a/and
+		:op1 (c/come-01
+			:ARG1 y
+			:ARG4 (h/here)
+			:direction (o/over))
+		:op2 (p/play-01
+			:ARG2 (b/ball)))
+	:ARG2 (y/you))

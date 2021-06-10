@@ -1,28 +1,25 @@
 import sys
 
 from amr_utils.amr_readers import AMR_Reader
-
-from display import Display
-from evaluate.utils import evaluate
+from models.reentrancy_model import Reentrancy_Model
+from models.relation_model import Relation_Model
 from models.subgraph_model import Subgraph_Model
 from nlp_data import add_nlp_data
 
 
-def coverage(amrs, alignments):
-    coverage_count = 0
-    total = 0
-    for amr in amrs:
-        for n in amr.nodes:
-            align = amr.get_alignment(alignments, node_id=n)
-            if align:
-                coverage_count+=1
-            total+=1
-    return f'{100*coverage_count/total:.2f}%'
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-T','--train', required=True, type=str, nargs=2,
+                    help='2 arguments: train AMR file and alignments file (must have nlp data)')
+parser.add_argument('-t','--test', type=str,
+                    help='test AMR file (must have nlp data)')
+args = parser.parse_args()
+
 
 def main():
-    train_align_file = sys.argv[1]
-    train_amr_file = sys.argv[2]
-    eval_amr_file = sys.argv[3]
+    train_amr_file = sys.argv[1]
+    eval_amr_file = sys.argv[2]
 
     reader = AMR_Reader()
     train_amrs = reader.load(train_amr_file, remove_wiki=True)
@@ -30,26 +27,42 @@ def main():
 
     eval_amrs = reader.load(eval_amr_file, remove_wiki=True)
     add_nlp_data(eval_amrs, eval_amr_file)
-    gold_dev_alignments = reader.load_alignments_from_json(sys.argv[4], eval_amrs)
 
-    train_alignments = reader.load_alignments_from_json(train_align_file, train_amrs)
+    # subgraphs
+    align_file = train_amr_file.replace('.txt','')+'.subgraph_alignments.json'
+    train_alignments = reader.load_alignments_from_json(align_file, train_amrs)
 
     align_model = Subgraph_Model(train_amrs, align_duplicates=True)
     align_model.update_parameters(train_amrs, train_alignments)
 
-    eval_alignments = align_model.align_all(eval_amrs)
-    print('align subgraphs', coverage(eval_amrs, eval_alignments))
-
-    evaluate(eval_amrs, eval_alignments, gold_dev_alignments)
-    print()
-
-    # write output
+    sub_alignments = align_model.align_all(eval_amrs)
     align_file = eval_amr_file.replace('.txt', '') + f'.subgraph_alignments.json'
     print(f'Writing subgraph alignments to: {align_file}')
-    reader.save_alignments_to_json(align_file, eval_alignments)
-    for amr in eval_amrs:
-        amr.alignments = eval_alignments[amr.id]
-    Display.style(eval_amrs, eval_amr_file.replace('.txt', '') + f'.subgraphs.html')
+    reader.save_alignments_to_json(align_file, sub_alignments)
+    
+    # relations
+    align_file = train_amr_file.replace('.txt', '') + '.relation_alignments.json'
+    train_alignments = reader.load_alignments_from_json(align_file, train_amrs)
+
+    align_model = Relation_Model(train_amrs, sub_alignments)
+    align_model.update_parameters(train_amrs, train_alignments)
+
+    rel_alignments = align_model.align_all(eval_amrs)
+    align_file = eval_amr_file.replace('.txt', '') + f'.relation_alignments.json'
+    print(f'Writing relation alignments to: {align_file}')
+    reader.save_alignments_to_json(align_file, rel_alignments)
+
+    # reentrancies
+    align_file = train_amr_file.replace('.txt', '') + '.reentrancy_alignments.json'
+    train_alignments = reader.load_alignments_from_json(align_file, train_amrs)
+
+    align_model = Reentrancy_Model(train_amrs, sub_alignments, rel_alignments)
+    align_model.update_parameters(train_amrs, train_alignments)
+
+    reent_alignments = align_model.align_all(eval_amrs)
+    align_file = eval_amr_file.replace('.txt', '') + f'.reentrancy_alignments.json'
+    print(f'Writing reentrancy alignments to: {align_file}')
+    reader.save_alignments_to_json(align_file, reent_alignments)
 
 
 if __name__=='__main__':
