@@ -386,6 +386,12 @@ class Subgraph_Model(Alignment_Model):
             if amr.nodes and amr.tokens and not any(align for align in alignments[amr.id]):
                 new_align = AMR_Alignment(type='subgraph', tokens=amr.spans[0], nodes=[n for n in amr.nodes], edges=[e for e in amr.edges], amr=amr)
                 alignments[amr.id].append(new_align)
+            for n in amr.nodes:
+                if not amr.get_alignment(alignments, node_id=n):
+                    parent = [e for e in amr.edges if e[-1]==n]
+                    if parent:
+                        align = amr.get_alignment(alignments, node_id=parent[0][0])
+                        align.nodes.append(n)
             # add subgraph edges
             for align in alignments[amr.id]:
                 if len(align.nodes) > 1:

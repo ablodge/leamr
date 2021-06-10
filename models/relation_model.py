@@ -4,7 +4,6 @@ from statistics import mean, stdev
 
 from amr_utils.alignments import AMR_Alignment
 
-from evaluate.utils import coverage
 from models.base_model import Alignment_Model
 from models.distance_model import Gaussian_Distance_Model, Skellam_Distance_Model
 from models.naive_model import External_Edge_Model
@@ -198,9 +197,21 @@ class Relation_Model(Alignment_Model):
             rule_based_align_relations(amr, self.subgraph_alignments, relation_alignments)
             exact_match_relations(amr, self.subgraph_alignments, relation_alignments)
         print('\r', end='')
-        print('Preprocessing coverage:', coverage(amrs, relation_alignments, mode='edges'))
+        print('Preprocessing coverage:', self.coverage(amrs, relation_alignments))
         return relation_alignments
 
+    def coverage(self, amrs, alignments):
+        coverage_count = 0
+        total = 0
+        for amr in amrs:
+            for e in amr.edges:
+                if amr.get_alignment(self.subgraph_alignments, edge=e):
+                    continue
+                align = amr.get_alignment(alignments, edge=e)
+                if align:
+                    coverage_count += 1
+                total += 1
+        return f'{100 * coverage_count / total:.2f}%'
 
     def readable_logp(self, amr, alignments, align):
         readable = super().readable_logp(amr, alignments, align)
@@ -299,7 +310,6 @@ class Relation_Model(Alignment_Model):
 
         for amr in amrs:
             for align in alignments[amr.id]:
-                for sub_align in self.subgraph_alignments[amr.id]:
-                    if any(e[0] in sub_align.nodes and e[-1] in sub_align.nodes for e in align.edges):
-                        align.edges = [e for e in align.edges if not (e[0] in sub_align.nodes and e[-1] in sub_align.nodes)]
+                sub_edges = {e for sub_align in self.subgraph_alignments[amr.id] for e in sub_align.edges}
+                align.edges = [e for e in align.edges if e not in sub_edges]
         return alignments
