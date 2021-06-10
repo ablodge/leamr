@@ -1,4 +1,5 @@
 import math
+import sys
 
 from statistics import stdev, mean
 
@@ -382,8 +383,8 @@ class Subgraph_Model(Alignment_Model):
 
         for amr in amrs:
             # hack to handle degenerate sentences
-            if not alignments[amr.id] and amr.nodes and amr.tokens:
-                new_align = AMR_Alignment(type='subgraph', tokens=amr.spans[0], nodes=[n for n in amr.nodes], edges=[e for e in amr.nodes], amr=amr)
+            if amr.nodes and amr.tokens and not any(align for align in alignments[amr.id]):
+                new_align = AMR_Alignment(type='subgraph', tokens=amr.spans[0], nodes=[n for n in amr.nodes], edges=[e for e in amr.edges], amr=amr)
                 alignments[amr.id].append(new_align)
             # add subgraph edges
             for align in alignments[amr.id]:
