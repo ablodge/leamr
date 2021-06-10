@@ -22,25 +22,12 @@ Also `<corpus>.spans.json`: spans for each sentence, grouping tokens which are e
 
 
 ## JSON Format
-The package includes tools for converting AMR alignments from and to JSON like the following.
-```
-....
-```
-
-The advantages of using JSON are:
-- Easy to load and save (No need to write a special script for reading some esoteric format)
-- Can store additional information in a `type` to distinguish different types of alignments
-- Can easily store multiple sets of alignments separately, without needing to modify an AMR file. That makes it easy to compare different sets of alignments. 
+Alignments are released as JSON files.
 
 To read alignments from a JSON file do:
 ```
 reader = AMR_Reader()
 alignments = reader.load_alignments_from_json(alignments_file)
-```
-To save alignments to a JSON file do:
-```
-reader = AMR_Reader()
-reader.save_alignments_to_json(alignments_file, alignments)
 ```
 
 # Get Alignments
