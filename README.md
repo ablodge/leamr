@@ -24,7 +24,7 @@ We release 4 layers of alignments: **subgraph**, **duplicate subgraph**, **relat
 
 For AMR Release 3.0 and Little Prince, as well as our gold test and dev data we release:
 
-- `<corpus>.subgraph_alignments.json`: Each **subgraph** alignment maps a DAG-shaped subgraph to a single span. We also include **duplicate subgraph** alignments in this layer with the alignment type "dupl-subgraph". Duplicate subgraph alignments are used to represent phenomena such as ellipsis where some semantic content in the AMR is unpronounced but whose semantics is determined by another AMR subgraph.
+- `<corpus>.subgraph_alignments.json`: Each **subgraph** alignment maps a DAG-shaped subgraph to a single span. We also include **duplicate subgraph** alignments in this layer with the alignment type "dupl-subgraph". Some AMRs involve a "duplicate" of some part of the graph to represent ellipsis and other phenomena where some part of the meaning is unpronounced. Duplicate subgraph alignments are used to represent such phenomena.
 - `<corpus>.relation_alignments.json`: Each **relation** alignment maps a span to a collection of _external_ edges, where each edge is between two subgraphs aligned in the previous layer. These alignments include argument structures (gave => :ARG0, :ARG1, :ARG2) and single relation alignments (when => :time).
 - `<corpus>.reentrancy_alignments.json`: Each **reentrancy** alignment maps a reentrant edge to the span which "triggers" that reentrancy, and is classified with a reentrancy type to account for phenomona like coreference, control, and coordination. 
 
