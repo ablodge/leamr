@@ -2,9 +2,9 @@
 
 **LEAMR** (**L**inguistically **E**nriched **AMR**, pronounced _lemur_) Alignments is a data release of alignments between AMR and English text for better parsing and probing of many different linguistic phenomena. We also include our code for the LEAMR aligner. For more details, read our paper.
 
-Austin Blodgett and Nathan Schneider. 2021. Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of AMR Alignments. In Proceedings of the 59th Annual Meeting ofthe Association for Computational Linguistics.
+Austin Blodgett and Nathan Schneider. 2021. _Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of AMR Alignments_. In Proceedings of the 59th Annual Meeting ofthe Association for Computational Linguistics.
 
-Also see [AMR-utils](https://github.com/ablodge/amr-utils) and the [AMR Bibliography](https://nert-nlp.github.io/AMR-Bibliography/).
+For other useful resouces for AMR research, also take a look at [AMR-utils](https://github.com/ablodge/amr-utils) and the [AMR Bibliography](https://nert-nlp.github.io/AMR-Bibliography/).
 
 
 # Install
