@@ -57,7 +57,7 @@ python unanonymize_alignments.py
 
 
 # Run Pre-trained Aligner
-For a file of unaligned AMRs `<unaligned amr file>`, you can create alignments by running the following code. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
+For a file of unaligned AMRs for English `<unaligned amr file>`, you can create alignments by running the following code. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
 
 ```
 python nlp_data_fast.py data-release/amrs/ldc+little_prince.txt
