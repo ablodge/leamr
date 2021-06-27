@@ -20,6 +20,13 @@ def main():
                 if filename.startswith(k):
                     amrs = amr_map[k]
                     aligns = load_from_json(file, amrs, unanonymize=True)
+                    # run quick test
+                    for amr in amrs:
+                        for align in aligns[amr.id]:
+                            for n in align.nodes:
+                                if n not in amr.nodes:
+                                    raise Exception(f'Failed to match alignments to AMR data. AMR "{amr.id}" has no node named "{n}".')
+                    # write output
                     write_to_json(file, aligns, amrs=amrs, anonymize=False)
                     break
 
