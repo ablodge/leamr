@@ -16,6 +16,12 @@ parser.add_argument('-T','--train', required=True, type=str,
                     help='train AMR file (must have nlp data, subgraph/rel alignments)')
 parser.add_argument('-t','--test', type=str, nargs=2,
                     help='2 arguments: test AMR file and gold alignments file (must have nlp data, subgraph/rel alignments)')
+parser.add_argument('--iter', type=int, default=5,
+                    help='number of iterations to train model')
+parser.add_argument('--save-model', type=str,
+                    help='params file to store the trained model')
+parser.add_argument('--load-model', type=str,
+                    help='params file to load model')
 args = parser.parse_args()
 
 
@@ -68,10 +74,16 @@ def main():
             spans = [align.tokens for align in pred_subgraph_alignments[amr.id] if align.type=='subgraph']
             amr.spans = spans
 
-    align_model = Reentrancy_Model(amrs, subgraph_alignments, relation_alignments)
+
+    if args.load_model:
+        print('Loading model from:', args.load_model)
+        align_model = Reentrancy_Model.load_model(args.load_model)
+    else:
+        align_model = Reentrancy_Model(amrs, subgraph_alignments, relation_alignments)
 
     iters = 5
 
+    alignments = None
     for i in range(iters):
         print(f'Epoch {i}: Training data')
         alignments = align_model.align_all(amrs)
@@ -87,6 +99,13 @@ def main():
             evaluate_reentrancies(eval_amrs, eval_alignments, gold_eval_alignments)
             report_progress(eval_amr_file, eval_alignments, reader, epoch=i)
             print()
+
+
+    report_progress(amr_file, alignments, reader)
+
+    if args.save_model:
+        align_model.save_model(args.save_model)
+        print('Saving model to:', args.save_model)
 
 if __name__ == '__main__':
     main()

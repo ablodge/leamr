@@ -10,7 +10,7 @@ For other useful resouces for AMR research, also take a look at [AMR-utils](http
 # Install
 
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 git clone https://github.com//ablodge/amr-utils
 pip install ./amr-utils
 ```
@@ -60,10 +60,9 @@ python unanonymize_alignments.py
 For a file of unaligned AMRs for English `<unaligned amr file>`, you can create alignments by running the following code. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
 
 ```
-python nlp_data_fast.py data-release/amrs/ldc+little_prince.txt
 python nlp_data.py <unaligned amr file>
 
-python align_with_pretrained_model -T data-release/amrs/ldc+little_prince.txt -M data-release/alignments/ldc+little_prince -t <unaligned amr file>
+python align_with_pretrained_model.py -t <unaligned amr file> --subgraph-model ldc+little_prince.subgraph_aligner.params --relation-model ldc+little_prince.relation_aligner.params --reentrancy-model ldc+little_prince.reentrancy_aligner.params 
 ```
 
 # Train Aligner
@@ -72,12 +71,9 @@ You can set `<train file>` to 'data-release/amrs/ldc+little_prince' or some othe
 ```
 python nlp_data.py <train file>.txt
 
-python train_subgraph_aligner.py -T <train file>.txt
-mv <train file>.subgraph_alignments.epoch4.json <train file>.subgraph_alignments.json 
-python train_relation_aligner.py -T <train file>.txt
-mv <train file>.relation_alignments.epoch4.json <train file>.relation_alignments.json 
-python train_reentrancy_aligner.py -T <train file>.txt
-mv <train file>.reentrancy_alignments.epoch4.json <train file>.reentrancy_alignments.json 
+python train_subgraph_aligner.py -T <train file>.txt --save-model <model name>.subgraph_aligner.params
+python train_relation_aligner.py -T <train file>.txt --save-model <model name>.relation_aligner.params
+python train_reentrancy_aligner.py -T <train file>.txt --save-model <model name>.reentrancy_aligner.params
 ```
 
 # Bibtex

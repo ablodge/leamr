@@ -129,33 +129,34 @@ class Internal_Edge_Model:
         self.node_translation_total = 0
         self.edge_count = Counter()
         self.edge_total = 0
-        self.tokens_count = Counter()
         self.tokens_total = 0
         self.add_noise = False
         self.first_iter = True
         self.token_label_f = token_label_f
-        self.init_params(amrs)
 
-    def init_params(self, amrs):
-        self.tokens_count = defaultdict(lambda: 0.)
-        self.concept_count = defaultdict(lambda: 0.)
+        # init params
+        self.tokens_count = {}
         for amr in amrs:
             tokens = {self.tokens_label(amr, span) for span in amr.spans}
             edges = {(self.edge_label(amr, e), self.node_pair_label(amr, e)) for e in amr.edges}
             for tok in tokens:
-                self.tokens_count[tok] += 1/len(tokens)
+                if tok not in self.tokens_count:
+                    self.tokens_count[tok] = 0
+                self.tokens_count[tok] += 1 / len(tokens)
                 if tok not in self.translation_count:
                     self.translation_count[tok] = defaultdict(lambda: 0.)
                     self.node_translation_count[tok] = defaultdict(lambda: 0.)
                 for edge, node_pair in edges:
-                    self.translation_count[tok][edge] += 1/len(tokens)
-                    self.node_translation_count[tok][node_pair] += 1/len(tokens)
+                    self.translation_count[tok][edge] += 1 / len(tokens)
+                    self.node_translation_count[tok][node_pair] += 1 / len(tokens)
             for edge, node_pair in edges:
-                self.edge_count[edge] += 1/len(tokens)
+                self.edge_count[edge] += 1 / len(tokens)
         self.translation_total = len(amrs)
         self.node_translation_total = len(amrs)
         self.edge_total = len(amrs)
         self.tokens_total = len(amrs)
+
+
 
     def edge_label(self, amr, e):
         s,r,t = e
@@ -178,12 +179,14 @@ class Internal_Edge_Model:
         self.node_translation_total = 0
         self.edge_count = Counter()
         self.edge_total = 0
-        self.tokens_count = Counter()
+        self.tokens_count = {}
         self.tokens_total = 0
 
         for amr in amrs:
             for span in amr.spans:
                 token_label = self.tokens_label(amr, span)
+                if token_label not in self.tokens_count:
+                    self.tokens_count[token_label] = 0
                 self.tokens_count[token_label] += 1
             if amr.id not in alignments:
                 continue
@@ -238,6 +241,8 @@ class Internal_Edge_Model:
             return {}
         token_label = self.tokens_label(amr, align.tokens)
         alpha = 0.0 if self.first_iter else self.alpha
+        if token_label not in self.tokens_count:
+            self.tokens_count[token_label] = 0
         token_logp = math.log(self.tokens_count[token_label] + alpha) - math.log(self.tokens_total)
         edge_logps = {}
         edges = [(s,r,t) for s,r,t in amr.edges if s in align.nodes and t in align.nodes]
@@ -270,6 +275,8 @@ class External_Edge_Model(Internal_Edge_Model):
 
     def factorized_logp(self, amr, align):
         token_label = self.tokens_label(amr, align.tokens)
+        if token_label not in self.tokens_count:
+            self.tokens_count[token_label] = 0
         token_logp = math.log(self.tokens_count[token_label] + self.alpha) - math.log(self.tokens_total)
         edge_logps = {}
         edges = [(s, r, t) for s, r, t in amr.edges if s in align.nodes and t in align.nodes]

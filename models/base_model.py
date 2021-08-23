@@ -1,4 +1,5 @@
-import math
+
+import pickle, dill
 import sys
 from collections import Counter
 
@@ -6,7 +7,19 @@ from amr_utils.alignments import AMR_Alignment
 from tqdm import tqdm
 
 
-class Alignment_Model:
+class Serializable:
+    def save_model(self, file):
+        with open(file, 'wb+') as fw:
+            pickle.dump(self, fw)
+
+    @staticmethod
+    def load_model(file):
+        with open(file, 'rb') as fr:
+            model = pickle.load(fr)
+        return model
+
+
+class Alignment_Model(Serializable):
 
     def __init__(self, amrs, alpha=0.01, smooth_translation=False):
 
@@ -148,3 +161,4 @@ class Alignment_Model:
 
 
         return alignments
+

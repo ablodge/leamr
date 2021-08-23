@@ -178,7 +178,8 @@ class Reentrancy_Model(Alignment_Model):
             else:
                 dists = {}
                 for s,r,t in candidates:
-                    if not amr.get_alignment(self.relation_alignments, edge=(s,r,t)):
+                    if not amr.get_alignment(self.relation_alignments, edge=(s,r,t)) \
+                            and any(amr.get_alignment(self.relation_alignments, edge=e2)for e2 in candidates):
                         continue
                     salign = amr.get_alignment(self.subgraph_alignments, node_id=s)
                     talign = amr.get_alignment(self.subgraph_alignments, node_id=t)
