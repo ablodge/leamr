@@ -17,6 +17,7 @@ from rule_based.subgraph_rules import fuzzy_align_subgraphs, postprocess_subgrap
 ENGLISH = True
 PARTIAL_CREDIT_RATE = 0.1
 DUPLICATE_RATE = 0.05
+ALIGN_SISTER_RELS = True
 
 
 class Subgraph_Model(Alignment_Model):
@@ -244,18 +245,19 @@ class Subgraph_Model(Alignment_Model):
                 candidate_neighbors.remove(n2)
 
         # handle "never => ever, -" and other similar cases
-        edge_map = {n:[] for n in amr.nodes}
-        for s,r,t in amr.edges:
-            edge_map[s].append(t)
-        if not edge_map[n]:
-            for n2 in amr.nodes:
-                if edge_map[n2]: continue
-                if n2 in unaligned: continue
-                if amr.nodes[n] == amr.nodes[n2]: continue
-                nalign = amr.get_alignment(alignments, node_id=n2)
-                if len(nalign.nodes)!=1: continue
-                if any(n in edge_map[p] and n2 in edge_map[p] for p in amr.nodes):
-                    candidate_neighbors.append(n2)
+        if ALIGN_SISTER_RELS:
+            edge_map = {n:[] for n in amr.nodes}
+            for s,r,t in amr.edges:
+                edge_map[s].append(t)
+            if not edge_map[n]:
+                for n2 in amr.nodes:
+                    if edge_map[n2]: continue
+                    if n2 in unaligned: continue
+                    if amr.nodes[n] == amr.nodes[n2]: continue
+                    nalign = amr.get_alignment(alignments, node_id=n2)
+                    if len(nalign.nodes)!=1: continue
+                    if any(n in edge_map[p] and n2 in edge_map[p] for p in amr.nodes):
+                        candidate_neighbors.append(n2)
 
         # special rules for multi-sentence, and, or
         if ENGLISH:

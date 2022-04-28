@@ -5,6 +5,8 @@ from amr_utils.alignments import AMR_Alignment
 from amr_utils.graph_utils import is_rooted_dag, get_connected_components
 
 
+ALIGN_SISTER_RELS = True
+
 def postprocess_subgraph(amr, alignments, align, english=False):
     # Certain AMR patterns should always be aligned as a single subgraph, such as named entities.
     # This function adds any mising nodes based on several patterns.
@@ -752,7 +754,7 @@ def is_subgraph(amr, nodes):
     if is_rooted_dag(amr, nodes):
         return True
     # handle "never => ever, -" and other similar cases
-    if len(nodes) == 2:
+    if len(nodes) == 2 and ALIGN_SISTER_RELS:
         nodes = nodes.copy()
         parents1 = [s for s, r, t in amr.edges if t == nodes[0]]
         parents2 = [s for s, r, t in amr.edges if t == nodes[1]]
