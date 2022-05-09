@@ -54,25 +54,34 @@ python build_data.py <LDC parent dir>
 python unanonymize_alignments.py
 ```
 
+# LEAMR Aligner
 
-# Run Pre-trained Aligner
+You will need to download spacy and stanza models for English:
+```
+python3 -m spacy download en_core_web_sm
+python3
+import stanza
+stanza.download('en')
+```
+
+## Run Pre-trained Aligner
 For a file of unaligned AMRs for English `<unaligned amr file>`, you can create alignments by running the following code. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
 
 ```
 python nlp_data.py <unaligned amr file>
 
-python align_with_pretrained_model.py -t <unaligned amr file> --subgraph-model ldc+little_prince.subgraph_aligner.params --relation-model ldc+little_prince.relation_aligner.params --reentrancy-model ldc+little_prince.reentrancy_aligner.params 
+python align_with_pretrained_model.py -t <unaligned amr file> --subgraph-model ldc+little_prince.subgraph_params.pkl --relation-model ldc+little_prince.relation_params.pkl --reentrancy-model ldc+little_prince.reentrancy_params.pkl
 ```
 
-# Train Aligner
+## Train Aligner
 You can set `<train file>` to 'data-release/amrs/ldc+little_prince' or some other AMR file name. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
 
 ```
 python nlp_data.py <train file>.txt
 
-python train_subgraph_aligner.py -T <train file>.txt --save-model <model name>.subgraph_aligner.params
-python train_relation_aligner.py -T <train file>.txt --save-model <model name>.relation_aligner.params
-python train_reentrancy_aligner.py -T <train file>.txt --save-model <model name>.reentrancy_aligner.params
+python train_subgraph_aligner.py -T <train file>.txt --save-model <model name>.subgraph_params.pkl
+python train_relation_aligner.py -T <train file>.txt --save-model <model name>.relation_params.pkl
+python train_reentrancy_aligner.py -T <train file>.txt --save-model <model name>.reentrancy_params.pkl
 ```
 
 # Bibtex
