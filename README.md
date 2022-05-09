@@ -45,12 +45,11 @@ alignments = reader.load_alignments_from_json(alignments_file)
 ## Get Alignments
 Anonymized alignments are stored in the folder `data-release/alignments`. To interpret them, you will need the associated AMR data.
 
-
 ## Get AMR Data
 You will first need to obtain AMR Release 3.0 from LDC: [https://catalog.ldc.upenn.edu/LDC2020T02](https://catalog.ldc.upenn.edu/LDC2020T02). Afterwards you can run the following code to unpack the remainder of the data. Make sure to specify `<LDC parent dir>` as the parent directory of your AMR Release 3.0 data.
 
 ```
-wget https://amr.isi.edu/download/amr-bank-struct-v1.6.txt -O data-release/amrs/little_prince.txt
+wget https://amr.isi.edu/download/amr-bank-struct-v3.0.txt -O data-release/amrs/little_prince.txt
 python build_data.py <LDC parent dir>
 python unanonymize_alignments.py
 ```
