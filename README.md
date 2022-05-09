@@ -65,6 +65,13 @@ stanza.download('en')
 ```
 
 ## Run Pre-trained Aligner
+First, make sure the param files have downloaded completely:
+```
+wget https://github.com/ablodge/leamr/raw/master/ldc%2Blittle_prince.subgraph_param.pkl -O ldc+little_prince.subgraph_param.pkl
+wget https://github.com/ablodge/leamr/raw/master/ldc%2Blittle_prince.relation_param.pkl -O ldc+little_prince.relation_param.pkl
+wget https://github.com/ablodge/leamr/raw/master/ldc%2Blittle_prince.reentrancy_param.pkl -O ldc+little_prince.reentrancy_param.pkl
+```
+
 For a file of unaligned AMRs for English `<unaligned amr file>`, you can create alignments by running the following code. The script `nlp_data.py` does necessary preprocessing and may take several hours to run on a large dataset.
 
 ```
