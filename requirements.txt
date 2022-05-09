@@ -4,3 +4,4 @@ tqdm==4.50.2
 neuralcoref==4.0
 penman==1.2.0
 scipy==1.5.2
+dill
