@@ -2,7 +2,7 @@
 
 **LEAMR** (**L**inguistically **E**nriched **AMR**, pronounced _lemur_) Alignments is a data release of alignments between AMR and English text for better parsing and probing of many different linguistic phenomena. We also include our code for the LEAMR aligner. For more details, read our paper.
 
-Austin Blodgett and Nathan Schneider. 2021. _Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of AMR Alignments_. In Proceedings of the 59th Annual Meeting ofthe Association for Computational Linguistics.
+Austin Blodgett and Nathan Schneider. 2021. [_Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of AMR Alignments_](https://aclanthology.org/2021.acl-long.257/). In Proceedings of the 59th Annual Meeting ofthe Association for Computational Linguistics.
 
 For other useful resouces for AMR research, also take a look at [AMR-utils](https://github.com/ablodge/amr-utils) and the [AMR Bibliography](https://nert-nlp.github.io/AMR-Bibliography/).
 
@@ -93,12 +93,18 @@ python train_reentrancy_aligner.py -T <train file>.txt --save-model <model name>
 
 # Bibtex
 ```
-@inproceedings{blodgett2021,
+@inproceedings{blodgett-schneider-2021-probabilistic,
     title = "Probabilistic, Structure-Aware Algorithms for Improved Variety, Accuracy, and Coverage of {AMR} Alignments",
-    author = "Blodgett, Austin and
+    author = "Blodgett, Austin  and
       Schneider, Nathan",
-    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics",
+    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
     month = aug,
-    year = 2021
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.acl-long.257",
+    doi = "10.18653/v1/2021.acl-long.257",
+    pages = "3310--3321"
 }
+
 ```
